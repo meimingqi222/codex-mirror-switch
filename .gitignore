@@ -18,7 +18,7 @@ go.work
 vendor/
 
 # Go模块下载缓存
-go.sum
+# go.sum 应该被提交到版本控制中以确保依赖一致性
 
 # 环境变量文件
 .env
