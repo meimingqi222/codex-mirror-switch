@@ -1,0 +1,129 @@
+# golangci-lint 配置文件
+# 更多配置选项请参考: https://golangci-lint.run/usage/configuration/
+
+run:
+  # 超时时间
+  timeout: 5m
+  # 要检查的Go版本
+  go: '1.24'
+  # 跳过自动生成的文件
+  skip-files:
+    - ".*\.pb\.go$"
+    - ".*\.gen\.go$"
+
+# 输出配置
+output:
+  # 输出格式: colored-line-number|line-number|json|tab|checkstyle|code-climate
+  format: colored-line-number
+  # 打印检查到的问题行
+  print-issued-lines: true
+  # 打印检查器名称
+  print-linter-name: true
+
+# 启用的检查器
+linters:
+  enable:
+    - errcheck      # 检查未处理的错误
+    - gosimple      # 简化代码建议
+    - govet         # Go官方检查器
+    - ineffassign   # 检查无效赋值
+    - staticcheck   # 静态分析检查
+    - typecheck     # 类型检查
+    - unused        # 检查未使用的代码
+    - gofmt         # 格式化检查
+    - goimports     # import排序检查
+    - misspell      # 拼写检查
+    - unconvert     # 不必要的类型转换
+    - unparam       # 未使用的函数参数
+    - gocritic      # Go代码审查
+    - gocyclo       # 圈复杂度检查
+    - dupl          # 重复代码检查
+    - goconst       # 重复字符串常量检查
+    - godot         # 注释句号检查
+    - whitespace    # 空白字符检查
+  
+  disable:
+    - deadcode      # 已弃用，使用unused替代
+    - varcheck      # 已弃用，使用unused替代
+    - structcheck   # 已弃用，使用unused替代
+
+# 检查器设置
+linters-settings:
+  # errcheck配置
+  errcheck:
+    # 检查类型断言
+    check-type-assertions: true
+    # 检查空白标识符
+    check-blank: false
+  
+  # gocyclo配置
+  gocyclo:
+    # 圈复杂度阈值
+    min-complexity: 15
+  
+  # dupl配置
+  dupl:
+    # 重复代码检查阈值
+    threshold: 100
+  
+  # goconst配置
+  goconst:
+    # 最小字符串长度
+    min-len: 3
+    # 最小出现次数
+    min-occurrences: 3
+  
+  # misspell配置
+  misspell:
+    # 语言设置
+    locale: US
+  
+  # gocritic配置
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+    disabled-checks:
+      - unnamedResult
+      - hugeParam
+  
+  # goimports配置
+  goimports:
+    # 本地包前缀
+    local-prefixes: codex-mirror
+
+# 问题配置
+issues:
+  # 排除默认的排除规则
+  exclude-use-default: false
+  
+  # 最大问题数量，0表示无限制
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  
+  # 排除特定问题
+  exclude-rules:
+    # 排除测试文件中的某些检查
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+    
+    # 排除main函数中的某些检查
+    - path: main\.go
+      linters:
+        - gocyclo
+    
+    # 排除生成的文件
+    - path: \.pb\.go
+      linters:
+        - all
+  
+  # 新问题检查（仅在CI中有用）
+  new: false
+  
+  # 修复模式
+  fix: false

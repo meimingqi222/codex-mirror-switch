@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        go-version: ['1.24']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ matrix.go-version }}
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Verify dependencies
+      run: go mod verify
+    
+    - name: Run tests
+      run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+    
+    - name: Run go vet
+      run: go vet ./...
+    
+    - name: Check formatting
+      if: runner.os != 'Windows'
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "以下文件需要格式化："
+          gofmt -s -l .
+          exit 1
+        fi
+    
+    - name: Check formatting (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        $unformatted = gofmt -s -l .
+        if ($unformatted) {
+          Write-Host "以下文件需要格式化："
+          Write-Host $unformatted
+          exit 1
+        }
+    
+    - name: Build binary
+      run: go build -v ./...
+    
+    - name: Upload coverage to Codecov
+      if: runner.os == 'Linux'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+    
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v3
+      with:
+        version: latest
+        args: --timeout=5m

@@ -1,0 +1,123 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+        exclude:
+          # Windows ARM64 支持有限，暂时排除
+          - goos: windows
+            goarch: arm64
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+    
+    - name: Get dependencies
+      run: go mod download
+    
+    - name: Build binary
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+      run: |
+        # 设置输出文件名
+        if [ "$GOOS" = "windows" ]; then
+          OUTPUT_NAME="codex-mirror-$GOOS-$GOARCH.exe"
+        else
+          OUTPUT_NAME="codex-mirror-$GOOS-$GOARCH"
+        fi
+        
+        # 编译二进制文件
+        go build -ldflags="-s -w" -o "$OUTPUT_NAME" main.go
+        
+        # 创建发布目录
+        mkdir -p release
+        mv "$OUTPUT_NAME" release/
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: codex-mirror-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: release/
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+    
+    - name: Run tests
+      run: go test -v ./...
+    
+    - name: Run go vet
+      run: go vet ./...
+    
+    - name: Run go fmt check
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "以下文件需要格式化："
+          gofmt -s -l .
+          exit 1
+        fi
+
+  release:
+    needs: [build, test]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: artifacts
+    
+    - name: Create release archives
+      run: |
+        mkdir -p release
+        cd artifacts
+        
+        # 为每个平台创建压缩包
+        for dir in */; do
+          platform=$(basename "$dir")
+          cd "$dir"
+          
+          # 根据平台选择压缩格式
+          if [[ "$platform" == *"windows"* ]]; then
+            zip -r "../../release/${platform}.zip" .
+          else
+            tar -czf "../../release/${platform}.tar.gz" .
+          fi
+          
+          cd ..
+        done
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release/*
+        generate_release_notes: true
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
