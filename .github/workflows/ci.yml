@@ -39,8 +39,13 @@ jobs:
     - name: Verify dependencies
       run: go mod verify
     
-    - name: Run tests
+    - name: Run tests (Unix)
+      if: runner.os != 'Windows'
       run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+    
+    - name: Run tests (Windows)
+      if: runner.os == 'Windows'
+      run: go test -race -coverprofile="${{ github.workspace }}\coverage.out" -covermode=atomic ./...
     
     - name: Run go vet
       run: go vet ./...
@@ -67,8 +72,16 @@ jobs:
     - name: Build binary
       run: go build -v ./...
     
-    - name: Upload coverage to Codecov
+    - name: Upload coverage to Codecov (Unix)
       if: runner.os == 'Linux'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+    
+    - name: Upload coverage to Codecov (Windows)
+      if: runner.os == 'Windows'
       uses: codecov/codecov-action@v3
       with:
         file: ./coverage.out

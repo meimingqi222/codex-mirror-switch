@@ -61,6 +61,8 @@ out/
 *.out
 coverage.txt
 coverage.html
+cover
+coverage
 
 # 项目特定文件
 codex-mirror.exe
