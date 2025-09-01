@@ -8,8 +8,8 @@ run:
   go: '1.24'
   # 跳过自动生成的文件
   skip-files:
-    - ".*\.pb\.go$"
-    - ".*\.gen\.go$"
+    - '.*\.pb\.go$'
+    - '.*\.gen\.go$'
 
 # 输出配置
 output:
