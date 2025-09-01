@@ -1,0 +1,13 @@
+# 确保 Go 文件在所有平台使用 LF 行尾符
+*.go text eol=lf
+*.mod text eol=lf
+*.sum text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+
+# 二进制文件
+*.exe binary
+*.so binary
+*.dylib binary
