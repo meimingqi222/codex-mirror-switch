@@ -4,10 +4,11 @@ import (
 	"fmt"
 
 	"codex-mirror/internal"
+
 	"github.com/spf13/cobra"
 )
 
-// addCmd 代表add命令
+// addCmd 代表add命令.
 var addCmd = &cobra.Command{
 	Use:   "add [name] [base-url] [api-key]",
 	Short: "添加新的镜像源",

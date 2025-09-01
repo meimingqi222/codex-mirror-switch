@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 )
 
-// VSCodeConfigManager VS Code配置管理器
+// VSCodeConfigManager VS Code配置管理器.
 type VSCodeConfigManager struct {
 	settingsPath string
 }
 
-// NewVSCodeConfigManager 创建新的VS Code配置管理器
+// NewVSCodeConfigManager 创建新的VS Code配置管理器.
 func NewVSCodeConfigManager() (*VSCodeConfigManager, error) {
 	settingsPath, err := GetVSCodeSettingsPath()
 	if err != nil {
@@ -30,7 +30,7 @@ func NewVSCodeConfigManager() (*VSCodeConfigManager, error) {
 	}, nil
 }
 
-// LoadSettings 加载VS Code设置
+// LoadSettings 加载VS Code设置.
 func (vcm *VSCodeConfigManager) LoadSettings() (map[string]interface{}, error) {
 	settings := make(map[string]interface{})
 
@@ -52,7 +52,7 @@ func (vcm *VSCodeConfigManager) LoadSettings() (map[string]interface{}, error) {
 	return settings, nil
 }
 
-// SaveSettings 保存VS Code设置
+// SaveSettings 保存VS Code设置.
 func (vcm *VSCodeConfigManager) SaveSettings(settings map[string]interface{}) error {
 	file, err := os.Create(vcm.settingsPath)
 	if err != nil {
@@ -69,7 +69,7 @@ func (vcm *VSCodeConfigManager) SaveSettings(settings map[string]interface{}) er
 	return nil
 }
 
-// ApplyMirror 应用镜像源配置到VS Code
+// ApplyMirror 应用镜像源配置到VS Code.
 func (vcm *VSCodeConfigManager) ApplyMirror(mirror *MirrorConfig) error {
 	// 加载现有设置
 	settings, err := vcm.LoadSettings()
@@ -106,7 +106,7 @@ func (vcm *VSCodeConfigManager) ApplyMirror(mirror *MirrorConfig) error {
 	return nil
 }
 
-// GetCurrentConfig 获取当前VS Code中的ChatGPT配置
+// GetCurrentConfig 获取当前VS Code中的ChatGPT配置.
 func (vcm *VSCodeConfigManager) GetCurrentConfig() (map[string]interface{}, error) {
 	settings, err := vcm.LoadSettings()
 	if err != nil {
@@ -128,7 +128,7 @@ func (vcm *VSCodeConfigManager) GetCurrentConfig() (map[string]interface{}, erro
 	return result, nil
 }
 
-// BackupSettings 备份当前设置
+// BackupSettings 备份当前设置.
 func (vcm *VSCodeConfigManager) BackupSettings() error {
 	if _, err := os.Stat(vcm.settingsPath); os.IsNotExist(err) {
 		// 设置文件不存在，无需备份
@@ -149,7 +149,7 @@ func (vcm *VSCodeConfigManager) BackupSettings() error {
 	return nil
 }
 
-// RemoveChatGPTConfig 移除ChatGPT相关配置
+// RemoveChatGPTConfig 移除ChatGPT相关配置.
 func (vcm *VSCodeConfigManager) RemoveChatGPTConfig() error {
 	settings, err := vcm.LoadSettings()
 	if err != nil {

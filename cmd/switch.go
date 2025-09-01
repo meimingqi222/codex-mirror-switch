@@ -4,17 +4,18 @@ import (
 	"fmt"
 
 	"codex-mirror/internal"
+
 	"github.com/spf13/cobra"
 )
 
 var (
-	// 命令行标志
+	// 命令行标志.
 	codexOnly  bool
 	vscodeOnly bool
 	noBackup   bool
 )
 
-// switchCmd 代表switch命令
+// switchCmd 代表switch命令.
 var switchCmd = &cobra.Command{
 	Use:   "switch [name]",
 	Short: "切换到指定的镜像源",
@@ -83,7 +84,7 @@ var switchCmd = &cobra.Command{
 	},
 }
 
-// updateCodexConfig 更新Codex配置
+// updateCodexConfig 更新Codex配置.
 func updateCodexConfig(mirror *internal.MirrorConfig) error {
 	ccm, err := internal.NewCodexConfigManager()
 	if err != nil {
@@ -101,7 +102,7 @@ func updateCodexConfig(mirror *internal.MirrorConfig) error {
 	return ccm.ApplyMirror(mirror)
 }
 
-// updateVSCodeConfig 更新VS Code配置
+// updateVSCodeConfig 更新VS Code配置.
 func updateVSCodeConfig(mirror *internal.MirrorConfig) error {
 	vcm, err := internal.NewVSCodeConfigManager()
 	if err != nil {
@@ -122,7 +123,7 @@ func updateVSCodeConfig(mirror *internal.MirrorConfig) error {
 func init() {
 	rootCmd.AddCommand(switchCmd)
 
-	// 添加命令行标志
+	// 添加命令行标志.
 	switchCmd.Flags().BoolVar(&codexOnly, "codex-only", false, "只更新Codex CLI配置")
 	switchCmd.Flags().BoolVar(&vscodeOnly, "vscode-only", false, "只更新VS Code配置")
 	switchCmd.Flags().BoolVar(&noBackup, "no-backup", false, "不备份现有配置")

@@ -6,7 +6,7 @@ import (
 	"runtime"
 )
 
-// GetCurrentPlatform 获取当前运行平台
+// GetCurrentPlatform 获取当前运行平台.
 func GetCurrentPlatform() Platform {
 	switch runtime.GOOS {
 	case "windows":
@@ -20,7 +20,7 @@ func GetCurrentPlatform() Platform {
 	}
 }
 
-// GetPathConfig 根据平台获取路径配置
+// GetPathConfig 根据平台获取路径配置.
 func GetPathConfig() (*PathConfig, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -52,7 +52,7 @@ func GetPathConfig() (*PathConfig, error) {
 	return config, nil
 }
 
-// EnsureDir 确保目录存在，如果不存在则创建
+// EnsureDir 确保目录存在，如果不存在则创建.
 func EnsureDir(dir string) error {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return os.MkdirAll(dir, 0755)
@@ -60,7 +60,7 @@ func EnsureDir(dir string) error {
 	return nil
 }
 
-// GetCodexConfigPath 获取Codex配置文件路径
+// GetCodexConfigPath 获取Codex配置文件路径.
 func GetCodexConfigPath() (string, error) {
 	pathConfig, err := GetPathConfig()
 	if err != nil {
@@ -69,7 +69,7 @@ func GetCodexConfigPath() (string, error) {
 	return filepath.Join(pathConfig.CodexConfigDir, "config.toml"), nil
 }
 
-// GetCodexAuthPath 获取Codex认证文件路径
+// GetCodexAuthPath 获取Codex认证文件路径.
 func GetCodexAuthPath() (string, error) {
 	pathConfig, err := GetPathConfig()
 	if err != nil {
@@ -78,7 +78,7 @@ func GetCodexAuthPath() (string, error) {
 	return filepath.Join(pathConfig.CodexConfigDir, "auth.json"), nil
 }
 
-// GetVSCodeSettingsPath 获取VS Code设置文件路径
+// GetVSCodeSettingsPath 获取VS Code设置文件路径.
 func GetVSCodeSettingsPath() (string, error) {
 	pathConfig, err := GetPathConfig()
 	if err != nil {

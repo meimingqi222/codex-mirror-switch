@@ -4,10 +4,11 @@ import (
 	"fmt"
 
 	"codex-mirror/internal"
+
 	"github.com/spf13/cobra"
 )
 
-// statusCmd 代表status命令
+// statusCmd 代表status命令.
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "显示当前配置状态",
@@ -57,7 +58,7 @@ var statusCmd = &cobra.Command{
 	},
 }
 
-// checkCodexStatus 检查Codex配置状态
+// checkCodexStatus 检查Codex配置状态.
 func checkCodexStatus(expectedMirror *internal.MirrorConfig) {
 	ccm, err := internal.NewCodexConfigManager()
 	if err != nil {
@@ -104,7 +105,7 @@ func checkCodexStatus(expectedMirror *internal.MirrorConfig) {
 	}
 }
 
-// checkVSCodeStatus 检查VS Code配置状态
+// checkVSCodeStatus 检查VS Code配置状态.
 func checkVSCodeStatus(expectedMirror *internal.MirrorConfig) {
 	vcm, err := internal.NewVSCodeConfigManager()
 	if err != nil {

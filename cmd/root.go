@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// rootCmd 代表基础命令，当不带任何子命令调用时执行
+// rootCmd 代表基础命令，当不带任何子命令调用时执行.
 var rootCmd = &cobra.Command{
 	Use:   "codex-mirror",
 	Short: "Codex镜像切换工具",
@@ -25,8 +25,8 @@ var rootCmd = &cobra.Command{
   codex-mirror status`,
 }
 
-// Execute 添加所有子命令到根命令并设置标志。
-// 这由main.main()调用。只需要对rootCmd执行一次。
+// Execute 添加所有子命令到根命令并设置标志.
+// 这由main.main()调用。只需要对rootCmd执行一次.
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
@@ -34,7 +34,7 @@ func Execute() {
 	}
 }
 
-// maskAPIKey 遮蔽API密钥，只显示前4位和后4位
+// maskAPIKey 遮蔽API密钥，只显示前4位和后4位.
 func maskAPIKey(apiKey string) string {
 	if len(apiKey) <= 8 {
 		return "****"
@@ -43,10 +43,10 @@ func maskAPIKey(apiKey string) string {
 }
 
 func init() {
-	// 在这里可以定义标志和配置设置
-	// Cobra支持持久标志，如果在这里定义，将对所有子命令全局可用
+	// 在这里可以定义标志和配置设置.
+	// Cobra支持持久标志，如果在这里定义，将对所有子命令全局可用.
 	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.codex-mirror.yaml)")
 
-	// Cobra也支持本地标志，只对特定命令运行
+	// Cobra也支持本地标志，只对特定命令运行.
 	// rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

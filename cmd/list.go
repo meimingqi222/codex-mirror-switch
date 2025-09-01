@@ -5,10 +5,11 @@ import (
 	"strings"
 
 	"codex-mirror/internal"
+
 	"github.com/spf13/cobra"
 )
 
-// listCmd 代表list命令
+// listCmd 代表list命令.
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "列出所有镜像源",
@@ -44,7 +45,7 @@ var listCmd = &cobra.Command{
 		for _, mirror := range mirrors {
 			prefix := "  "
 			if mirror.Name == currentMirror.Name {
-				prefix = "* " // 标记当前使用的镜像源
+				prefix = "* " // 标记当前使用的镜像源.
 			}
 
 			fmt.Printf("%s%s\n", prefix, mirror.Name)

@@ -4,10 +4,11 @@ import (
 	"fmt"
 
 	"codex-mirror/internal"
+
 	"github.com/spf13/cobra"
 )
 
-// removeCmd 代表remove命令
+// removeCmd 代表remove命令.
 var removeCmd = &cobra.Command{
 	Use:   "remove [name]",
 	Short: "删除指定的镜像源",
