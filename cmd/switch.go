@@ -43,6 +43,12 @@ var switchCmd = &cobra.Command{
 			return
 		}
 
+		// 修复mirrors.toml中的env_key格式
+		if err := mm.FixEnvKeyFormat(); err != nil {
+			fmt.Printf("修复env_key格式失败: %v\n", err)
+			return
+		}
+
 		// 切换镜像源
 		if err := mm.SwitchMirror(mirrorName); err != nil {
 			fmt.Printf("切换镜像源失败: %v\n", err)

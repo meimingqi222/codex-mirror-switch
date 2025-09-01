@@ -150,6 +150,24 @@ api_key = ""
   - `CODEX_LOCAL_API_KEY`
   - `CODEX_MIRROR_API_KEY`
 
+### 持久化机制
+
+为了确保环境变量在重启后仍然有效，工具在不同平台使用不同的持久化方式：
+
+**Windows:**
+- 使用 `setx` 命令设置用户级环境变量
+- 环境变量将永久存储在注册表中
+
+**macOS:**
+- 自动写入 `~/.zshrc` 和 `~/.bash_profile` 文件
+- 支持 zsh（默认）和 bash shell
+
+**Linux:**
+- 自动写入 `~/.bashrc` 和 `~/.profile` 文件
+- 支持大多数常见的 shell 环境
+
+> **注意:** 在 macOS 和 Linux 上，需要重新启动终端或执行 `source ~/.bashrc`（或对应的配置文件）才能使环境变量生效。
+
 ## 命令行选项
 
 ### 全局选项

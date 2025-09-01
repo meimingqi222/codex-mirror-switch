@@ -5,6 +5,7 @@ type MirrorConfig struct {
 	Name    string `json:"name" toml:"name"`         // 镜像源名称
 	BaseURL string `json:"base_url" toml:"base_url"` // API基础URL
 	APIKey  string `json:"api_key" toml:"api_key"`   // API密钥
+	EnvKey  string `json:"env_key" toml:"env_key"`   // 环境变量key
 }
 
 // SystemConfig 系统配置结构.
@@ -33,7 +34,7 @@ type ModelProviderConfig struct {
 
 // CodexAuth Codex CLI认证文件结构.
 type CodexAuth struct {
-	APIKey string `json:"api_key"` // API密钥
+	APIKey string `json:"OPENAI_API_KEY"` // API密钥
 }
 
 // VSCodeSettings VS Code设置文件结构.

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -94,6 +95,7 @@ func (mm *MirrorManager) AddMirror(name, baseURL, apiKey string) error {
 		Name:    name,
 		BaseURL: baseURL,
 		APIKey:  apiKey,
+		EnvKey:  fmt.Sprintf("CODEX_%s_API_KEY", strings.ToUpper(name)), // 设置环境变量key为CODEX_前缀格式
 	}
 
 	mm.config.Mirrors = append(mm.config.Mirrors, newMirror)
@@ -165,4 +167,28 @@ func (mm *MirrorManager) UpdateMirror(name, baseURL, apiKey string) error {
 	}
 
 	return fmt.Errorf("镜像源 '%s' 不存在", name)
+}
+
+// FixEnvKeyFormat 修复所有镜像源的env_key格式为CODEX_XXX_API_KEY.
+func (mm *MirrorManager) FixEnvKeyFormat() error {
+	updated := false
+
+	// 检查并修复每个镜像源的env_key格式
+	for i, mirror := range mm.config.Mirrors {
+		expectedEnvKey := fmt.Sprintf("CODEX_%s_API_KEY", strings.ToUpper(mirror.Name))
+		// 如果env_key为空或者格式不正确，都需要修复
+		if mirror.EnvKey == "" || mirror.EnvKey != expectedEnvKey {
+			fmt.Printf("修复镜像源 '%s' 的env_key: '%s' -> '%s'\n", mirror.Name, mirror.EnvKey, expectedEnvKey)
+			mm.config.Mirrors[i].EnvKey = expectedEnvKey
+			updated = true
+		}
+	}
+
+	// 如果有更新，保存配置文件
+	if updated {
+		fmt.Println("保存更新后的mirrors.toml配置...")
+		return mm.saveConfig()
+	}
+
+	return nil
 }

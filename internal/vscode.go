@@ -88,7 +88,7 @@ func (vcm *VSCodeConfigManager) ApplyMirror(mirror *MirrorConfig) error {
 	// 更新chatgpt.apiBase
 	settings["chatgpt.apiBase"] = mirror.BaseURL
 
-	// 更新chatgpt.config
+	// 更新chatgpt.config，只保留基本配置，不设置baseurl和key
 	chatgptConfig := make(map[string]interface{})
 	if existingConfig, exists := settings["chatgpt.config"]; exists {
 		if configMap, ok := existingConfig.(map[string]interface{}); ok {
@@ -96,13 +96,15 @@ func (vcm *VSCodeConfigManager) ApplyMirror(mirror *MirrorConfig) error {
 		}
 	}
 
-	// 设置API密钥
-	if mirror.APIKey != "" {
-		chatgptConfig["apiKey"] = mirror.APIKey
-	}
+	// 设置基本配置项
+	chatgptConfig["preferred_auth_method"] = "apikey"
+	chatgptConfig["model"] = "gpt-5"
+	chatgptConfig["model_reasoning_effort"] = "high"
+	chatgptConfig["wire_api"] = "responses"
 
-	// 设置API基础URL
-	chatgptConfig["apiBaseUrl"] = mirror.BaseURL
+	// 移除不必要的baseurl和key设置
+	delete(chatgptConfig, "apiKey")
+	delete(chatgptConfig, "apiBaseUrl")
 
 	settings["chatgpt.config"] = chatgptConfig
 

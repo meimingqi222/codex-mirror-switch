@@ -42,6 +42,43 @@ func NewCodexConfigManager() (*CodexConfigManager, error) {
 }
 
 // UpdateConfig 更新Codex配置文件.
+// FixEnvKeyFormat 修复所有镜像源的env_key格式为CODEX_XXX_API_KEY
+func (ccm *CodexConfigManager) FixEnvKeyFormat() error {
+	// 读取现有配置
+	var config CodexConfig
+	if _, err := os.Stat(ccm.configPath); err != nil {
+		return nil // 配置文件不存在，无需修复
+	}
+
+	if _, err := toml.DecodeFile(ccm.configPath, &config); err != nil {
+		return fmt.Errorf("读取配置文件失败: %v", err)
+	}
+
+	if config.ModelProviders == nil {
+		return nil // 没有镜像源配置
+	}
+
+	// 检查并修复每个镜像源的env_key格式
+	updated := false
+	for name, provider := range config.ModelProviders {
+		expectedEnvKey := fmt.Sprintf("CODEX_%s_API_KEY", strings.ToUpper(name))
+		if provider.EnvKey != expectedEnvKey {
+			provider.EnvKey = expectedEnvKey
+			config.ModelProviders[name] = provider
+			updated = true
+		}
+	}
+
+	// 如果有更新，保存配置文件
+	if updated {
+		if err := ccm.saveConfig(&config); err != nil {
+			return fmt.Errorf("保存配置文件失败: %v", err)
+		}
+	}
+
+	return nil
+}
+
 func (ccm *CodexConfigManager) UpdateConfig(mirror *MirrorConfig) error {
 	// 尝试读取现有配置
 	var config CodexConfig
@@ -79,25 +116,27 @@ func (ccm *CodexConfigManager) UpdateConfig(mirror *MirrorConfig) error {
 		Name:    mirror.Name,
 		BaseURL: mirror.BaseURL,
 		WireAPI: "responses",
-		EnvKey:  mirror.Name,
+		EnvKey:  mirror.EnvKey, // 直接使用镜像源中已设置的env_key
 	}
 
-	// 如果是packycode提供商，保留现有的wire_api和env_key
+	// 如果已存在配置，保留现有的wire_api和正确格式的env_key
 	if existingProvider, exists := config.ModelProviders[mirror.Name]; exists {
 		if existingProvider.WireAPI != "" {
 			providerConfig.WireAPI = existingProvider.WireAPI
 		}
-		if existingProvider.EnvKey != "" {
+		// 如果现有的env_key已经是正确的CODEX_前缀格式，保留它
+		expectedEnvKey := fmt.Sprintf("CODEX_%s_API_KEY", strings.ToUpper(mirror.Name))
+		if existingProvider.EnvKey == expectedEnvKey {
 			providerConfig.EnvKey = existingProvider.EnvKey
 		}
 	}
 
 	config.ModelProviders[mirror.Name] = providerConfig
 
+	// 设置model_provider为当前切换的镜像源名称
+	config.ModelProvider = mirror.Name
+
 	// 如果没有设置默认值，设置默认值
-	if config.ModelProvider == "" {
-		config.ModelProvider = "packycode"
-	}
 	if config.Model == "" {
 		config.Model = "gpt-5"
 	}
@@ -175,17 +214,27 @@ func (ccm *CodexConfigManager) SetEnvironmentVariable(envKey, apiKey string) err
 		return fmt.Errorf("环境变量key不能为空")
 	}
 
-	// 构造带前缀的环境变量名，避免冲突
-	fullEnvKey := fmt.Sprintf("CODEX_%s_API_KEY", strings.ToUpper(envKey))
-
+	// 直接使用传入的envKey，不再添加前缀（因为已经包含CODEX_前缀）
 	// 在当前进程中设置环境变量
-	if err := os.Setenv(fullEnvKey, apiKey); err != nil {
-		return fmt.Errorf("设置环境变量 %s 失败: %v", fullEnvKey, err)
+	if err := os.Setenv(envKey, apiKey); err != nil {
+		return fmt.Errorf("设置环境变量 %s 失败: %v", envKey, err)
 	}
 
-	// 在Windows中设置用户级环境变量（持久化）
-	if err := ccm.setWindowsUserEnvVar(fullEnvKey, apiKey); err != nil {
-		return fmt.Errorf("设置Windows用户环境变量 %s 失败: %v", fullEnvKey, err)
+	// 根据平台设置持久化环境变量
+	platform := GetCurrentPlatform()
+	switch platform {
+	case PlatformWindows:
+		if err := ccm.setWindowsUserEnvVar(envKey, apiKey); err != nil {
+			return fmt.Errorf("设置Windows用户环境变量 %s 失败: %v", envKey, err)
+		}
+	case PlatformMac:
+		if err := ccm.setMacUserEnvVar(envKey, apiKey); err != nil {
+			return fmt.Errorf("设置macOS用户环境变量 %s 失败: %v", envKey, err)
+		}
+	case PlatformLinux:
+		if err := ccm.setLinuxUserEnvVar(envKey, apiKey); err != nil {
+			return fmt.Errorf("设置Linux用户环境变量 %s 失败: %v", envKey, err)
+		}
 	}
 
 	return nil
@@ -203,8 +252,121 @@ func (ccm *CodexConfigManager) setWindowsUserEnvVar(envKey, apiKey string) error
 	return nil
 }
 
+// setMacUserEnvVar 在macOS中设置用户级环境变量.
+func (ccm *CodexConfigManager) setMacUserEnvVar(envKey, apiKey string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("获取用户主目录失败: %v", err)
+	}
+
+	// 尝试写入多个配置文件以确保兼容性
+	shellFiles := []string{
+		filepath.Join(homeDir, ".zshrc"),        // zsh (macOS 默认)
+		filepath.Join(homeDir, ".bash_profile"), // bash
+	}
+
+	envLine := fmt.Sprintf("export %s=%s", envKey, apiKey)
+	updated := false
+
+	for _, shellFile := range shellFiles {
+		if err := ccm.updateShellProfile(shellFile, envKey, envLine); err != nil {
+			fmt.Printf("警告: 更新 %s 失败: %v\n", shellFile, err)
+			continue
+		}
+		updated = true
+	}
+
+	if !updated {
+		return fmt.Errorf("无法更新任何shell配置文件")
+	}
+
+	fmt.Printf("✓ 环境变量 %s 已添加到shell配置文件\n", envKey)
+	return nil
+}
+
+// setLinuxUserEnvVar 在Linux中设置用户级环境变量.
+func (ccm *CodexConfigManager) setLinuxUserEnvVar(envKey, apiKey string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("获取用户主目录失败: %v", err)
+	}
+
+	// 尝试写入多个配置文件以确保兼容性
+	shellFiles := []string{
+		filepath.Join(homeDir, ".bashrc"),  // bash (最常见)
+		filepath.Join(homeDir, ".profile"), // 通用profile
+	}
+
+	envLine := fmt.Sprintf("export %s=%s", envKey, apiKey)
+	updated := false
+
+	for _, shellFile := range shellFiles {
+		if err := ccm.updateShellProfile(shellFile, envKey, envLine); err != nil {
+			fmt.Printf("警告: 更新 %s 失败: %v\n", shellFile, err)
+			continue
+		}
+		updated = true
+	}
+
+	if !updated {
+		return fmt.Errorf("无法更新任何shell配置文件")
+	}
+
+	fmt.Printf("✓ 环境变量 %s 已添加到shell配置文件\n", envKey)
+	return nil
+}
+
+// updateShellProfile 更新shell配置文件，添加或更新环境变量.
+func (ccm *CodexConfigManager) updateShellProfile(shellFile, envKey, envLine string) error {
+	// 读取现有内容
+	var existingContent []byte
+	var err error
+	if _, err = os.Stat(shellFile); err == nil {
+		existingContent, err = os.ReadFile(shellFile)
+		if err != nil {
+			return fmt.Errorf("读取文件失败: %v", err)
+		}
+	}
+
+	content := string(existingContent)
+	lines := strings.Split(content, "\n")
+
+	// 检查是否已存在该环境变量的设置
+	envPattern := fmt.Sprintf("export %s=", envKey)
+	found := false
+	for i, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), envPattern) {
+			// 更新现有行
+			lines[i] = envLine
+			found = true
+			break
+		}
+	}
+
+	// 如果没找到，添加新行
+	if !found {
+		// 添加注释和环境变量
+		lines = append(lines, "")
+		lines = append(lines, "# Codex Mirror Switch - API Key")
+		lines = append(lines, envLine)
+	}
+
+	// 写回文件
+	newContent := strings.Join(lines, "\n")
+	if err := os.WriteFile(shellFile, []byte(newContent), 0644); err != nil {
+		return fmt.Errorf("写入文件失败: %v", err)
+	}
+
+	return nil
+}
+
 // ApplyMirror 应用镜像源配置到Codex CLI.
 func (ccm *CodexConfigManager) ApplyMirror(mirror *MirrorConfig) error {
+	// 首先修复所有镜像源的env_key格式
+	if err := ccm.FixEnvKeyFormat(); err != nil {
+		return fmt.Errorf("修复env_key格式失败: %v", err)
+	}
+
 	// 更新配置文件
 	if err := ccm.UpdateConfig(mirror); err != nil {
 		return fmt.Errorf("更新Codex配置失败: %v", err)
@@ -313,6 +475,29 @@ func (ccm *CodexConfigManager) BackupConfig() error {
 }
 
 // copyFile 复制文件.
+// saveConfig 保存配置到文件
+func (ccm *CodexConfigManager) saveConfig(config *CodexConfig) error {
+	// 确保目录存在
+	if err := os.MkdirAll(filepath.Dir(ccm.configPath), 0755); err != nil {
+		return fmt.Errorf("创建配置目录失败: %v", err)
+	}
+
+	// 直接写入配置文件
+	file, err := os.Create(ccm.configPath)
+	if err != nil {
+		return fmt.Errorf("创建配置文件失败: %v", err)
+	}
+	defer file.Close()
+
+	// 编码并写入配置
+	encoder := toml.NewEncoder(file)
+	if err := encoder.Encode(config); err != nil {
+		return fmt.Errorf("编码配置失败: %v", err)
+	}
+
+	return nil
+}
+
 func copyFile(src, dst string) error {
 	srcFile, err := os.Open(src)
 	if err != nil {
