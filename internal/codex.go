@@ -254,47 +254,27 @@ func (ccm *CodexConfigManager) setWindowsUserEnvVar(envKey, apiKey string) error
 
 // setMacUserEnvVar 在macOS中设置用户级环境变量.
 func (ccm *CodexConfigManager) setMacUserEnvVar(envKey, apiKey string) error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("获取用户主目录失败: %v", err)
-	}
-
-	// 尝试写入多个配置文件以确保兼容性
-	shellFiles := []string{
-		filepath.Join(homeDir, ".zshrc"),        // zsh (macOS 默认)
-		filepath.Join(homeDir, ".bash_profile"), // bash
-	}
-
-	envLine := fmt.Sprintf("export %s=%s", envKey, apiKey)
-	updated := false
-
-	for _, shellFile := range shellFiles {
-		if err := ccm.updateShellProfile(shellFile, envKey, envLine); err != nil {
-			fmt.Printf("警告: 更新 %s 失败: %v\n", shellFile, err)
-			continue
-		}
-		updated = true
-	}
-
-	if !updated {
-		return fmt.Errorf("无法更新任何shell配置文件")
-	}
-
-	fmt.Printf("✓ 环境变量 %s 已添加到shell配置文件\n", envKey)
-	return nil
+	shellFiles := []string{".zshrc", ".bash_profile"} // zsh (macOS 默认), bash
+	return ccm.setUnixUserEnvVar(envKey, apiKey, shellFiles)
 }
 
 // setLinuxUserEnvVar 在Linux中设置用户级环境变量.
 func (ccm *CodexConfigManager) setLinuxUserEnvVar(envKey, apiKey string) error {
+	shellFiles := []string{".bashrc", ".profile"} // bash (最常见), 通用profile
+	return ccm.setUnixUserEnvVar(envKey, apiKey, shellFiles)
+}
+
+// setUnixUserEnvVar 在Unix系统（macOS和Linux）中设置用户级环境变量.
+func (ccm *CodexConfigManager) setUnixUserEnvVar(envKey, apiKey string, shellFileNames []string) error {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("获取用户主目录失败: %v", err)
 	}
 
-	// 尝试写入多个配置文件以确保兼容性
-	shellFiles := []string{
-		filepath.Join(homeDir, ".bashrc"),  // bash (最常见)
-		filepath.Join(homeDir, ".profile"), // 通用profile
+	// 构建完整的文件路径
+	shellFiles := make([]string, len(shellFileNames))
+	for i, name := range shellFileNames {
+		shellFiles[i] = filepath.Join(homeDir, name)
 	}
 
 	envLine := fmt.Sprintf("export %s=%s", envKey, apiKey)
@@ -345,15 +325,13 @@ func (ccm *CodexConfigManager) updateShellProfile(shellFile, envKey, envLine str
 
 	// 如果没找到，添加新行
 	if !found {
-		// 添加注释和环境变量
-		lines = append(lines, "")
-		lines = append(lines, "# Codex Mirror Switch - API Key")
-		lines = append(lines, envLine)
+		// 合并多个append操作
+		lines = append(lines, "", "# Codex Mirror Switch - API Key.", envLine)
 	}
 
 	// 写回文件
 	newContent := strings.Join(lines, "\n")
-	if err := os.WriteFile(shellFile, []byte(newContent), 0644); err != nil {
+	if err := os.WriteFile(shellFile, []byte(newContent), 0o644); err != nil {
 		return fmt.Errorf("写入文件失败: %v", err)
 	}
 
@@ -434,8 +412,8 @@ func (ccm *CodexConfigManager) GetCurrentAuth() (*CodexAuth, error) {
 		return nil, fmt.Errorf("打开Codex认证文件失败: %v", err)
 	}
 	defer func() {
-		if err := file.Close(); err != nil {
-			fmt.Printf("警告: 关闭认证文件失败: %v\n", err)
+		if closeErr := file.Close(); closeErr != nil {
+			fmt.Printf("警告: 关闭认证文件失败: %v\n", closeErr)
 		}
 	}()
 
@@ -475,10 +453,10 @@ func (ccm *CodexConfigManager) BackupConfig() error {
 }
 
 // copyFile 复制文件.
-// saveConfig 保存配置到文件
+// saveConfig 保存配置到文件.
 func (ccm *CodexConfigManager) saveConfig(config *CodexConfig) error {
 	// 确保目录存在
-	if err := os.MkdirAll(filepath.Dir(ccm.configPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(ccm.configPath), 0o755); err != nil {
 		return fmt.Errorf("创建配置目录失败: %v", err)
 	}
 
@@ -487,7 +465,11 @@ func (ccm *CodexConfigManager) saveConfig(config *CodexConfig) error {
 	if err != nil {
 		return fmt.Errorf("创建配置文件失败: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			fmt.Printf("警告: 关闭配置文件失败: %v\n", closeErr)
+		}
+	}()
 
 	// 编码并写入配置
 	encoder := toml.NewEncoder(file)
@@ -498,14 +480,15 @@ func (ccm *CodexConfigManager) saveConfig(config *CodexConfig) error {
 	return nil
 }
 
+// copyFile 复制文件.
 func copyFile(src, dst string) error {
 	srcFile, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		if err := srcFile.Close(); err != nil {
-			fmt.Printf("警告: 关闭源文件失败: %v\n", err)
+		if closeErr := srcFile.Close(); closeErr != nil {
+			fmt.Printf("警告: 关闭源文件失败: %v\n", closeErr)
 		}
 	}()
 
@@ -514,8 +497,8 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	defer func() {
-		if err := dstFile.Close(); err != nil {
-			fmt.Printf("警告: 关闭目标文件失败: %v\n", err)
+		if closeErr := dstFile.Close(); closeErr != nil {
+			fmt.Printf("警告: 关闭目标文件失败: %v\n", closeErr)
 		}
 	}()
 
