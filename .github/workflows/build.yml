@@ -41,9 +41,9 @@ jobs:
       run: |
         # 设置输出文件名
         if [ "$GOOS" = "windows" ]; then
-          OUTPUT_NAME="codex-mirror-$GOOS-$GOARCH.exe"
+          OUTPUT_NAME="codex-mirror.exe"
         else
-          OUTPUT_NAME="codex-mirror-$GOOS-$GOARCH"
+          OUTPUT_NAME="codex-mirror"
         fi
         
         # 编译二进制文件
