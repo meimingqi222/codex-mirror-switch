@@ -57,7 +57,11 @@ func (mm *MirrorManager) saveConfig() error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("警告: 关闭配置文件失败: %v\n", err)
+		}
+	}()
 
 	return toml.NewEncoder(file).Encode(mm.config)
 }

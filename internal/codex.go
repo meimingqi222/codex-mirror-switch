@@ -110,7 +110,11 @@ func (ccm *CodexConfigManager) UpdateConfig(mirror *MirrorConfig) error {
 	if err != nil {
 		return fmt.Errorf("创建配置文件失败: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("警告: 关闭配置文件失败: %v\n", err)
+		}
+	}()
 
 	// 手动构建TOML内容以避免嵌套的[model_providers]结构
 	content := fmt.Sprintf(`model_provider = "%s"
@@ -150,7 +154,11 @@ func (ccm *CodexConfigManager) UpdateAuth(mirror *MirrorConfig) error {
 	if err != nil {
 		return fmt.Errorf("创建认证文件失败: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("警告: 关闭认证文件失败: %v\n", err)
+		}
+	}()
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
@@ -263,7 +271,11 @@ func (ccm *CodexConfigManager) GetCurrentAuth() (*CodexAuth, error) {
 	if err != nil {
 		return nil, fmt.Errorf("打开Codex认证文件失败: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("警告: 关闭认证文件失败: %v\n", err)
+		}
+	}()
 
 	var auth CodexAuth
 	if err := json.NewDecoder(file).Decode(&auth); err != nil {
@@ -306,13 +318,21 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer srcFile.Close()
+	defer func() {
+		if err := srcFile.Close(); err != nil {
+			fmt.Printf("警告: 关闭源文件失败: %v\n", err)
+		}
+	}()
 
 	dstFile, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
-	defer dstFile.Close()
+	defer func() {
+		if err := dstFile.Close(); err != nil {
+			fmt.Printf("警告: 关闭目标文件失败: %v\n", err)
+		}
+	}()
 
 	_, err = dstFile.ReadFrom(srcFile)
 	return err

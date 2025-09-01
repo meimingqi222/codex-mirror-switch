@@ -6,15 +6,11 @@ run:
   timeout: 5m
   # 要检查的Go版本
   go: '1.24'
-  # 跳过自动生成的文件
-  skip-files:
-    - '.*\.pb\.go$'
-    - '.*\.gen\.go$'
 
 # 输出配置
 output:
   # 输出格式: colored-line-number|line-number|json|tab|checkstyle|code-climate
-  format: colored-line-number
+  formats: colored-line-number
   # 打印检查到的问题行
   print-issued-lines: true
   # 打印检查器名称
@@ -42,10 +38,7 @@ linters:
     - godot         # 注释句号检查
     - whitespace    # 空白字符检查
   
-  disable:
-    - deadcode      # 已弃用，使用unused替代
-    - varcheck      # 已弃用，使用unused替代
-    - structcheck   # 已弃用，使用unused替代
+  # disable: # 移除已弃用的 linter
 
 # 检查器设置
 linters-settings:
@@ -97,6 +90,11 @@ linters-settings:
 issues:
   # 排除默认的排除规则
   exclude-use-default: false
+  
+  # 排除自动生成的文件
+  exclude-files:
+    - '.*\.pb\.go$'
+    - '.*\.gen\.go$'
   
   # 最大问题数量，0表示无限制
   max-issues-per-linter: 0

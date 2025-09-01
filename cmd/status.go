@@ -140,11 +140,12 @@ func checkVSCodeStatus(expectedMirror *internal.MirrorConfig) {
 		}
 	}
 
-	if apiBaseMatch && configMatch {
+	switch {
+	case apiBaseMatch && configMatch:
 		fmt.Println("  ✓ 配置正确")
-	} else if len(config) == 0 {
+	case len(config) == 0:
 		fmt.Println("  ⚠️  未配置ChatGPT插件")
-	} else {
+	default:
 		fmt.Println("  ⚠️  配置不匹配")
 		if !apiBaseMatch {
 			fmt.Printf("    chatgpt.apiBase不匹配\n")

@@ -43,7 +43,11 @@ func (vcm *VSCodeConfigManager) LoadSettings() (map[string]interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("打开VS Code设置文件失败: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("警告: 关闭VS Code设置文件失败: %v\n", err)
+		}
+	}()
 
 	if err := json.NewDecoder(file).Decode(&settings); err != nil {
 		return nil, fmt.Errorf("解析VS Code设置文件失败: %v", err)
@@ -58,7 +62,11 @@ func (vcm *VSCodeConfigManager) SaveSettings(settings map[string]interface{}) er
 	if err != nil {
 		return fmt.Errorf("创建VS Code设置文件失败: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("警告: 关闭VS Code设置文件失败: %v\n", err)
+		}
+	}()
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
