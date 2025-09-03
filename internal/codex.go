@@ -101,6 +101,7 @@ func (ccm *CodexConfigManager) UpdateConfig(mirror *MirrorConfig) error {
 			ModelProvider:        "packycode",
 			Model:                "gpt-5",
 			ModelReasoningEffort: "high",
+			DisableResponseStorage: true,
 			ModelProviders:       make(map[string]ModelProviderConfig),
 		}
 		rawConfig = make(map[string]interface{})
@@ -144,6 +145,9 @@ func (ccm *CodexConfigManager) UpdateConfig(mirror *MirrorConfig) error {
 		config.ModelReasoningEffort = "high"
 	}
 
+	// 强制写入禁用响应存储的配置
+	config.DisableResponseStorage = true
+
 	// 创建或更新config.toml文件
 	file, err := os.Create(ccm.configPath)
 	if err != nil {
@@ -159,9 +163,10 @@ func (ccm *CodexConfigManager) UpdateConfig(mirror *MirrorConfig) error {
 	content := fmt.Sprintf(`model_provider = "%s"
 model = "%s"
 model_reasoning_effort = "%s"
+disable_response_storage = %t
 
 `,
-		config.ModelProvider, config.Model, config.ModelReasoningEffort)
+		config.ModelProvider, config.Model, config.ModelReasoningEffort, config.DisableResponseStorage)
 
 	// 添加每个模型提供商的配置
 	for name, provider := range config.ModelProviders {

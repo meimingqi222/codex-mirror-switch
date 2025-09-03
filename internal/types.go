@@ -19,6 +19,7 @@ type CodexConfig struct {
 	ModelProvider        string                         `toml:"model_provider,omitempty"`
 	Model                string                         `toml:"model,omitempty"`
 	ModelReasoningEffort string                         `toml:"model_reasoning_effort,omitempty"`
+	DisableResponseStorage bool                           `toml:"disable_response_storage,omitempty"`
 	ModelProviders       map[string]ModelProviderConfig `toml:"model_providers,omitempty"`
 	// 保留其他未知字段
 	OtherFields map[string]interface{} `toml:"-"`
