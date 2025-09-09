@@ -98,11 +98,11 @@ func (ccm *CodexConfigManager) UpdateConfig(mirror *MirrorConfig) error {
 	} else {
 		// 如果配置文件不存在，创建默认配置
 		config = CodexConfig{
-			ModelProvider:        "packycode",
-			Model:                "gpt-5",
-			ModelReasoningEffort: "high",
+			ModelProvider:          "packycode",
+			Model:                  "gpt-5",
+			ModelReasoningEffort:   "high",
 			DisableResponseStorage: true,
-			ModelProviders:       make(map[string]ModelProviderConfig),
+			ModelProviders:         make(map[string]ModelProviderConfig),
 		}
 		rawConfig = make(map[string]interface{})
 	}
