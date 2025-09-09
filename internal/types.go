@@ -3,8 +3,8 @@ package internal
 // MirrorConfig 镜像源配置结构.
 type MirrorConfig struct {
 	Name    string `json:"name" toml:"name"`         // 镜像源名称
-	BaseURL string `json:"base_url" toml:"base_url"` // API基础URL
-	APIKey  string `json:"api_key" toml:"api_key"`   // API密钥
+	BaseURL string `json:"base_url" toml:"base_url"` // API基础URL.
+	APIKey  string `json:"api_key" toml:"api_key"`   // API密钥.
 	EnvKey  string `json:"env_key" toml:"env_key"`   // 环境变量key
 }
 
@@ -35,7 +35,7 @@ type ModelProviderConfig struct {
 
 // CodexAuth Codex CLI认证文件结构.
 type CodexAuth struct {
-	APIKey string `json:"OPENAI_API_KEY"` // API密钥
+	APIKey string `json:"OPENAI_API_KEY"` // API密钥.
 }
 
 // VSCodeSettings VS Code设置文件结构.
@@ -64,7 +64,7 @@ const (
 
 // PathConfig 路径配置结构.
 type PathConfig struct {
-	CodexConfigDir  string // Codex配置目录
-	VSCodeConfigDir string // VS Code配置目录
+	CodexConfigDir  string // Codex配置目录.
+	VSCodeConfigDir string // VS Code配置目录.
 	HomeDir         string // 用户主目录
 }

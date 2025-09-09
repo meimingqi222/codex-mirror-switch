@@ -42,7 +42,7 @@ func NewCodexConfigManager() (*CodexConfigManager, error) {
 }
 
 // UpdateConfig 更新Codex配置文件.
-// FixEnvKeyFormat 修复所有镜像源的env_key格式为CODEX_XXX_API_KEY
+// FixEnvKeyFormat 修复所有镜像源的env_key格式为CODEX_XXX_API_KEY.
 func (ccm *CodexConfigManager) FixEnvKeyFormat() error {
 	// 读取现有配置
 	var config CodexConfig
@@ -259,13 +259,13 @@ func (ccm *CodexConfigManager) setWindowsUserEnvVar(envKey, apiKey string) error
 
 // setMacUserEnvVar 在macOS中设置用户级环境变量.
 func (ccm *CodexConfigManager) setMacUserEnvVar(envKey, apiKey string) error {
-	shellFiles := []string{".zshrc", ".bash_profile"} // zsh (macOS 默认), bash
+	shellFiles := []string{".zshrc", ".bash_profile"} // zsh (macOS 默认), bash.
 	return ccm.setUnixUserEnvVar(envKey, apiKey, shellFiles)
 }
 
 // setLinuxUserEnvVar 在Linux中设置用户级环境变量.
 func (ccm *CodexConfigManager) setLinuxUserEnvVar(envKey, apiKey string) error {
-	shellFiles := []string{".bashrc", ".profile"} // bash (最常见), 通用profile
+	shellFiles := []string{".bashrc", ".profile"} // bash (最常见), 通用profile.
 	return ccm.setUnixUserEnvVar(envKey, apiKey, shellFiles)
 }
 

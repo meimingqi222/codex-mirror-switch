@@ -34,17 +34,17 @@ func GetPathConfig() (*PathConfig, error) {
 
 	switch platform {
 	case PlatformWindows:
-		// Windows路径配置
+		// Windows路径配置.
 		config.CodexConfigDir = filepath.Join(homeDir, ".codex")
 		config.VSCodeConfigDir = filepath.Join(homeDir, "AppData", "Roaming", "Code", "User")
 
 	case PlatformMac:
-		// Mac路径配置
+		// Mac路径配置.
 		config.CodexConfigDir = filepath.Join(homeDir, ".codex")
 		config.VSCodeConfigDir = filepath.Join(homeDir, "Library", "Application Support", "Code", "User")
 
 	case PlatformLinux:
-		// Linux路径配置
+		// Linux路径配置.
 		config.CodexConfigDir = filepath.Join(homeDir, ".codex")
 		config.VSCodeConfigDir = filepath.Join(homeDir, ".config", "Code", "User")
 	}
