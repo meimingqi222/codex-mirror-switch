@@ -41,16 +41,7 @@ jobs:
     - name: Run tests
       run: go test -v -race ./...
     
-    # 可选：如果 golangci-lint 支持当前 Go 版本，则运行
-    - name: Run golangci-lint (optional)
-      continue-on-error: true
-      uses: golangci/golangci-lint-action@v3
-      with:
-        version: latest
-        args: --timeout=5m
-        only-new-issues: true
-    
-    # 安装并运行轻量级替代工具
+    # 运行轻量级代码质量检查工具
     - name: Install and run revive
       run: |
         go install github.com/mgechev/revive@latest
