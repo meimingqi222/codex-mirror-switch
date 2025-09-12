@@ -58,7 +58,7 @@ func (em *EnvManager) setEnvironmentVariable(envKey, value string) error {
 	case PlatformLinux:
 		err = em.setLinuxUserEnvVar(envKey, value)
 	}
-	
+
 	if err != nil {
 		return fmt.Errorf("设置 %s 用户环境变量 %s 失败: %v", platform, envKey, err)
 	}

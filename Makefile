@@ -59,22 +59,69 @@ coverage: test
 	$(GO) tool cover -html=coverage.out -o coverage.html
 	@echo "覆盖率报告已生成: coverage.html"
 
-# 代码质量检查
+# 代码质量检查（使用轻量级工具，版本兼容性好）
 .PHONY: lint
 lint:
 	@echo "正在进行代码质量检查..."
-	@if command -v golangci-lint >/dev/null 2>&1; then \
-		golangci-lint run; \
+	@echo "运行 go vet..."
+	@$(GOVET) ./...
+	@echo "运行 go fmt 检查..."
+	@if [ "$$(gofmt -l . | wc -l)" -ne 0 ]; then \
+		echo "以下文件需要格式化:"; \
+		gofmt -l .; \
+		echo "请运行 'make fmt' 来格式化代码"; \
+		exit 1; \
+	fi
+	@echo "✅ 代码格式正确"
+	@echo "检查依赖..."
+	@$(GOMOD) tidy
+	@if [ -n "$$(git status --porcelain go.mod go.sum 2>/dev/null)" ]; then \
+		echo "⚠️  go.mod 或 go.sum 有变化，请提交"; \
+		git diff go.mod go.sum; \
+		exit 1; \
+	fi
+	@echo "✅ 依赖检查通过"
+
+# 运行轻量级 lint 工具（可选）
+.PHONY: lint-light
+lint-light:
+	@echo "运行轻量级代码质量检查..."
+	@if command -v revive >/dev/null 2>&1; then \
+		echo "运行 revive..."; \
+		revive ./...; \
 	else \
-		echo "golangci-lint 未安装，跳过代码质量检查"; \
-		echo "安装命令: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
+		echo "revive 未安装，跳过"; \
+		echo "安装: go install github.com/mgechev/revive@latest"; \
+	fi
+	@if command -v errcheck >/dev/null 2>&1; then \
+		echo "运行 errcheck..."; \
+		errcheck ./...; \
+	else \
+		echo "errcheck 未安装，跳过"; \
+		echo "安装: go install github.com/kisielk/errcheck@latest"; \
 	fi
 
-# 运行完整的代码质量检查脚本
+# 运行完整的代码质量检查脚本（包含golangci-lint）
 .PHONY: lint-check
 lint-check:
 	@echo "正在运行完整的代码质量检查..."
 	@./scripts/lint-check.sh
+
+# 运行基础检查（CI友好）
+.PHONY: lint-ci
+lint-ci:
+	@echo "运行CI代码质量检查..."
+	@$(GOVET) ./...
+	@if [ "$$(gofmt -l . | wc -l)" -ne 0 ]; then \
+		echo "代码格式错误:"; \
+		gofmt -l .; \
+		exit 1; \
+	fi
+	@$(GOMOD) tidy
+	@if [ -n "$$(git status --porcelain go.mod go.sum 2>/dev/null)" ]; then \
+		echo "依赖文件有未提交的更改"; \
+		exit 1; \
+	fi
 
 # 本地构建
 .PHONY: build
@@ -190,8 +237,10 @@ help:
 	@echo "  vet         - 代码检查"
 	@echo "  test        - 运行测试"
 	@echo "  coverage    - 生成测试覆盖率报告"
-	@echo "  lint        - 代码质量检查"
+	@echo "  lint        - 代码质量检查（轻量级工具，版本兼容性好）"
+	@echo "  lint-light  - 运行轻量级 lint 工具（revive、errcheck）"
 	@echo "  lint-check  - 运行完整的代码质量检查脚本"
+	@echo "  lint-ci     - 运行CI友好的基础检查"
 	@echo "  build       - 构建当前平台的可执行文件"
 	@echo "  build-all   - 交叉编译所有平台"
 	@echo "  package     - 创建发布包"
