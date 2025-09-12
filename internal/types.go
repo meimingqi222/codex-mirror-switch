@@ -32,7 +32,7 @@ type CodexConfig struct {
 	ModelReasoningEffort   string                         `toml:"model_reasoning_effort,omitempty"`
 	DisableResponseStorage bool                           `toml:"disable_response_storage,omitempty"`
 	ModelProviders         map[string]ModelProviderConfig `toml:"model_providers,omitempty"`
-	// 保留其他未知字段
+	// 保留其他未知字段.
 	OtherFields map[string]interface{} `toml:"-"`
 }
 
@@ -53,7 +53,7 @@ type CodexAuth struct {
 type VSCodeSettings struct {
 	ChatGPTAPIBase string                 `json:"chatgpt.apiBase,omitempty"`
 	ChatGPTConfig  map[string]interface{} `json:"chatgpt.config,omitempty"`
-	// 保留其他设置
+	// 保留其他设置.
 	OtherSettings map[string]interface{} `json:"-"`
 }
 

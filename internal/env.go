@@ -49,19 +49,18 @@ func (em *EnvManager) setEnvironmentVariable(envKey, value string) error {
 
 	// 根据平台设置持久化环境变量
 	platform := GetCurrentPlatform()
+	var err error
 	switch platform {
 	case PlatformWindows:
-		if err := em.setWindowsUserEnvVar(envKey, value); err != nil {
-			return fmt.Errorf("设置 Windows 用户环境变量 %s 失败: %v", envKey, err)
-		}
+		err = em.setWindowsUserEnvVar(envKey, value)
 	case PlatformMac:
-		if err := em.setMacUserEnvVar(envKey, value); err != nil {
-			return fmt.Errorf("设置 macOS 用户环境变量 %s 失败: %v", envKey, err)
-		}
+		err = em.setMacUserEnvVar(envKey, value)
 	case PlatformLinux:
-		if err := em.setLinuxUserEnvVar(envKey, value); err != nil {
-			return fmt.Errorf("设置 Linux 用户环境变量 %s 失败: %v", envKey, err)
-		}
+		err = em.setLinuxUserEnvVar(envKey, value)
+	}
+	
+	if err != nil {
+		return fmt.Errorf("设置 %s 用户环境变量 %s 失败: %v", platform, envKey, err)
 	}
 
 	return nil
@@ -178,17 +177,15 @@ func cleanupOldCodexEnvVars(lines []string) []string {
 		trimmed := strings.TrimSpace(line)
 
 		// 检查是否是注释行且下一行是要清理的环境变量
-		if trimmed == "# Codex Mirror Switch - API Key" || trimmed == "# Codex Mirror Switch - API Key." {
-			// 检查下一行是否存在
-			if i+1 < len(lines) {
-				nextLine := lines[i+1]
-				nextTrimmed := strings.TrimSpace(nextLine)
+		if (trimmed == "# Codex Mirror Switch - API Key" || trimmed == "# Codex Mirror Switch - API Key.") &&
+			i+1 < len(lines) {
+			nextLine := lines[i+1]
+			nextTrimmed := strings.TrimSpace(nextLine)
 
-				// 如果下一行是要清理的环境变量，跳过注释行和环境变量行
-				if shouldCleanupEnvVar(nextTrimmed) {
-					i += 2 // 跳过注释行和环境变量行
-					continue
-				}
+			// 如果下一行是要清理的环境变量，跳过注释行和环境变量行
+			if shouldCleanupEnvVar(nextTrimmed) {
+				i += 2 // 跳过注释行和环境变量行
+				continue
 			}
 		}
 

@@ -16,7 +16,7 @@ func GetCurrentPlatform() Platform {
 	case "linux":
 		return PlatformLinux
 	default:
-		return PlatformLinux // 默认使用Linux路径
+		return PlatformLinux // 默认使用Linux路径.
 	}
 }
 
