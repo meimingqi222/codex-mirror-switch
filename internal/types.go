@@ -72,12 +72,12 @@ const (
 	PlatformMac     Platform = "mac"
 	PlatformLinux   Platform = "linux"
 
-	// 环境变量常量
+	// 环境变量常量.
 	CodexSwitchAPIKeyEnv  = "CODEX_SWITCH_OPENAI_API_KEY"
 	AnthropicBaseURLEnv   = "ANTHROPIC_BASE_URL"
 	AnthropicAuthTokenEnv = "ANTHROPIC_AUTH_TOKEN"
 
-	// 默认镜像源名称
+	// 默认镜像源名称.
 	DefaultMirrorName = "official"
 )
 

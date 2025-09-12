@@ -75,20 +75,22 @@ func checkClaudeStatus(mm *internal.MirrorManager) {
 	tokenMatch := authToken == currentClaude.APIKey
 
 	fmt.Printf("  环境变量 ANTHROPIC_BASE_URL: ")
-	if baseURL == "" {
+	switch {
+	case baseURL == "":
 		fmt.Printf("❌ 未设置\n")
-	} else if urlMatch {
+	case urlMatch:
 		fmt.Printf("✓ 正确\n")
-	} else {
+	default:
 		fmt.Printf("⚠️  不匹配 (当前: %s, 期望: %s)\n", baseURL, currentClaude.BaseURL)
 	}
 
 	fmt.Printf("  环境变量 ANTHROPIC_AUTH_TOKEN: ")
-	if authToken == "" {
+	switch {
+	case authToken == "":
 		fmt.Printf("❌ 未设置\n")
-	} else if tokenMatch {
+	case tokenMatch:
 		fmt.Printf("✓ 正确\n")
-	} else {
+	default:
 		fmt.Printf("⚠️  不匹配\n")
 	}
 }
@@ -157,11 +159,12 @@ func checkCodexStatus(mm *internal.MirrorManager) {
 	}
 
 	fmt.Printf("  环境变量 %s: ", envVarName)
-	if envKey == "" {
+	switch {
+	case envKey == "":
 		fmt.Printf("❌ 未设置\n")
-	} else if envMatch {
+	case envMatch:
 		fmt.Printf("✓ 正确\n")
-	} else {
+	default:
 		fmt.Printf("⚠️  不匹配\n")
 	}
 }

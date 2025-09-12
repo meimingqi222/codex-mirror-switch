@@ -134,22 +134,24 @@ func (mm *MirrorManager) RemoveMirror(name string) error {
 	}
 
 	for i, mirror := range mm.config.Mirrors {
-		if mirror.Name == name {
-			// 如果删除的是当前使用的镜像源，切换到官方镜像源
-			if mm.config.CurrentMirror == name {
-				mm.config.CurrentMirror = DefaultMirrorName
-			}
-			if mm.config.CurrentCodex == name {
-				mm.config.CurrentCodex = DefaultMirrorName
-			}
-			if mm.config.CurrentClaude == name {
-				mm.config.CurrentClaude = ""
-			}
-
-			// 删除镜像源
-			mm.config.Mirrors = append(mm.config.Mirrors[:i], mm.config.Mirrors[i+1:]...)
-			return mm.saveConfig()
+		if mirror.Name != name {
+			continue
 		}
+
+		// 如果删除的是当前使用的镜像源，切换到官方镜像源
+		if mm.config.CurrentMirror == name {
+			mm.config.CurrentMirror = DefaultMirrorName
+		}
+		if mm.config.CurrentCodex == name {
+			mm.config.CurrentCodex = DefaultMirrorName
+		}
+		if mm.config.CurrentClaude == name {
+			mm.config.CurrentClaude = ""
+		}
+
+		// 删除镜像源
+		mm.config.Mirrors = append(mm.config.Mirrors[:i], mm.config.Mirrors[i+1:]...)
+		return mm.saveConfig()
 	}
 
 	return fmt.Errorf("镜像源 '%s' 不存在", name)
@@ -363,9 +365,7 @@ func (mm *MirrorManager) discoverCodexFromConfig(discoveredMirrors map[string]Mi
 					fmt.Printf("关闭文件失败: %v\n", closeErr)
 				}
 			}()
-			if err := json.NewDecoder(file).Decode(&auth); err == nil {
-				// 成功读取认证信息
-			}
+			_ = json.NewDecoder(file).Decode(&auth)
 		}
 	}
 
@@ -394,7 +394,7 @@ func (mm *MirrorManager) discoverCodexFromConfig(discoveredMirrors map[string]Mi
 	}
 }
 
-// getApiKeyForProvider 智能获取提供商的 API 密钥
+// getApiKeyForProvider 智能获取提供商的 API 密钥.
 func (mm *MirrorManager) getApiKeyForProvider(auth CodexAuth) string {
 	// Codex 固定使用 CODEX_SWITCH_OPENAI_API_KEY 环境变量
 	envKey := CodexSwitchAPIKeyEnv
