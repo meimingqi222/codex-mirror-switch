@@ -71,6 +71,14 @@ const (
 	PlatformWindows Platform = "windows"
 	PlatformMac     Platform = "mac"
 	PlatformLinux   Platform = "linux"
+
+	// 环境变量常量
+	CodexSwitchAPIKeyEnv  = "CODEX_SWITCH_OPENAI_API_KEY"
+	AnthropicBaseURLEnv   = "ANTHROPIC_BASE_URL"
+	AnthropicAuthTokenEnv = "ANTHROPIC_AUTH_TOKEN"
+
+	// 默认镜像源名称
+	DefaultMirrorName = "official"
 )
 
 // PathConfig 路径配置结构.

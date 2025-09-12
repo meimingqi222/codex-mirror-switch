@@ -19,12 +19,12 @@ func NewEnvManager() *EnvManager {
 // SetClaudeEnvVars 设置 Claude Code 环境变量.
 func (em *EnvManager) SetClaudeEnvVars(baseURL, authToken string) error {
 	// 设置 ANTHROPIC_BASE_URL
-	if err := em.setEnvironmentVariable("ANTHROPIC_BASE_URL", baseURL); err != nil {
+	if err := em.setEnvironmentVariable(AnthropicBaseURLEnv, baseURL); err != nil {
 		return fmt.Errorf("设置 ANTHROPIC_BASE_URL 失败: %v", err)
 	}
 
 	// 设置 ANTHROPIC_AUTH_TOKEN
-	if err := em.setEnvironmentVariable("ANTHROPIC_AUTH_TOKEN", authToken); err != nil {
+	if err := em.setEnvironmentVariable(AnthropicAuthTokenEnv, authToken); err != nil {
 		return fmt.Errorf("设置 ANTHROPIC_AUTH_TOKEN 失败: %v", err)
 	}
 
@@ -82,17 +82,17 @@ func (em *EnvManager) setWindowsUserEnvVar(envKey, value string) error {
 // setMacUserEnvVar 在 macOS 中设置用户级环境变量.
 func (em *EnvManager) setMacUserEnvVar(envKey, value string) error {
 	shellFiles := []string{".zshrc"} // macOS 默认使用 zsh
-	return em.setUnixUserEnvVar(envKey, value, shellFiles)
+	return setUnixUserEnvVar(envKey, value, shellFiles)
 }
 
 // setLinuxUserEnvVar 在 Linux 中设置用户级环境变量.
 func (em *EnvManager) setLinuxUserEnvVar(envKey, value string) error {
 	shellFiles := []string{".bashrc", ".profile"} // bash (最常见), 通用 profile
-	return em.setUnixUserEnvVar(envKey, value, shellFiles)
+	return setUnixUserEnvVar(envKey, value, shellFiles)
 }
 
 // setUnixUserEnvVar 在 Unix 系统（macOS 和 Linux）中设置用户级环境变量.
-func (em *EnvManager) setUnixUserEnvVar(envKey, value string, shellFileNames []string) error {
+func setUnixUserEnvVar(envKey, value string, shellFileNames []string) error {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("获取用户主目录失败: %v", err)
@@ -108,7 +108,7 @@ func (em *EnvManager) setUnixUserEnvVar(envKey, value string, shellFileNames []s
 	updated := false
 
 	for _, shellFile := range shellFiles {
-		if err := em.updateShellProfile(shellFile, envKey, envLine); err != nil {
+		if err := updateShellProfile(shellFile, envKey, envLine); err != nil {
 			fmt.Printf("警告: 更新 %s 失败: %v\n", shellFile, err)
 			continue
 		}
@@ -124,8 +124,7 @@ func (em *EnvManager) setUnixUserEnvVar(envKey, value string, shellFileNames []s
 }
 
 // updateShellProfile 更新 shell 配置文件，添加或更新环境变量.
-func (em *EnvManager) updateShellProfile(shellFile, envKey, envLine string) error {
-	// 读取现有内容
+func updateShellProfile(shellFile, envKey, envLine string) error {
 	var existingContent []byte
 	var err error
 	if _, err = os.Stat(shellFile); err == nil {
@@ -140,7 +139,7 @@ func (em *EnvManager) updateShellProfile(shellFile, envKey, envLine string) erro
 
 	// 对于所有 Codex 相关的环境变量，先清理所有相关的旧环境变量
 	if strings.HasPrefix(envKey, "CODEX_") {
-		lines = em.cleanupOldCodexEnvVars(lines)
+		lines = cleanupOldCodexEnvVars(lines)
 	}
 
 	// 检查是否已存在该环境变量的设置
@@ -157,7 +156,6 @@ func (em *EnvManager) updateShellProfile(shellFile, envKey, envLine string) erro
 
 	// 如果没找到，添加新行
 	if !found {
-		// 合并多个 append 操作
 		lines = append(lines, "", "# Codex Mirror Switch - API Key", envLine)
 	}
 
@@ -170,8 +168,8 @@ func (em *EnvManager) updateShellProfile(shellFile, envKey, envLine string) erro
 	return nil
 }
 
-// cleanupOldCodexEnvVars 清理旧的 Codex 相关环境变量
-func (em *EnvManager) cleanupOldCodexEnvVars(lines []string) []string {
+// cleanupOldCodexEnvVars 清理旧的 Codex 相关环境变量.
+func cleanupOldCodexEnvVars(lines []string) []string {
 	var cleanedLines []string
 	i := 0
 
@@ -187,7 +185,7 @@ func (em *EnvManager) cleanupOldCodexEnvVars(lines []string) []string {
 				nextTrimmed := strings.TrimSpace(nextLine)
 
 				// 如果下一行是要清理的环境变量，跳过注释行和环境变量行
-				if em.shouldCleanupEnvVar(nextTrimmed) {
+				if shouldCleanupEnvVar(nextTrimmed) {
 					i += 2 // 跳过注释行和环境变量行
 					continue
 				}
@@ -195,7 +193,7 @@ func (em *EnvManager) cleanupOldCodexEnvVars(lines []string) []string {
 		}
 
 		// 检查当前行是否是要清理的环境变量
-		if em.shouldCleanupEnvVar(trimmed) {
+		if shouldCleanupEnvVar(trimmed) {
 			i += 1 // 跳过环境变量行
 			continue
 		}
@@ -208,8 +206,8 @@ func (em *EnvManager) cleanupOldCodexEnvVars(lines []string) []string {
 	return cleanedLines
 }
 
-// shouldCleanupEnvVar 判断是否应该清理该环境变量行
-func (em *EnvManager) shouldCleanupEnvVar(line string) bool {
+// shouldCleanupEnvVar 判断是否应该清理该环境变量行.
+func shouldCleanupEnvVar(line string) bool {
 	// 跳过旧的 CODEX_*_API_KEY 环境变量
 	if strings.HasPrefix(line, "export CODEX_") && strings.HasSuffix(line, "_API_KEY=") {
 		return true

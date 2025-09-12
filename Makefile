@@ -70,6 +70,12 @@ lint:
 		echo "安装命令: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
 	fi
 
+# 运行完整的代码质量检查脚本
+.PHONY: lint-check
+lint-check:
+	@echo "正在运行完整的代码质量检查..."
+	@./scripts/lint-check.sh
+
 # 本地构建
 .PHONY: build
 build: deps
@@ -165,6 +171,13 @@ dev-setup:
 	@echo "安装开发工具..."
 	$(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	$(GO) install golang.org/x/vuln/cmd/govulncheck@latest
+	@if command -v pre-commit >/dev/null 2>&1; then \
+		echo "安装 pre-commit hooks..."; \
+		pre-commit install; \
+	else \
+		echo "pre-commit 未安装，跳过 hooks 安装"; \
+		echo "安装命令: pip install pre-commit"; \
+	fi
 	@echo "开发环境设置完成"
 
 # 显示帮助信息
@@ -178,6 +191,7 @@ help:
 	@echo "  test        - 运行测试"
 	@echo "  coverage    - 生成测试覆盖率报告"
 	@echo "  lint        - 代码质量检查"
+	@echo "  lint-check  - 运行完整的代码质量检查脚本"
 	@echo "  build       - 构建当前平台的可执行文件"
 	@echo "  build-all   - 交叉编译所有平台"
 	@echo "  package     - 创建发布包"

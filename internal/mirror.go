@@ -72,11 +72,11 @@ func (mm *MirrorManager) saveConfig() error {
 // initDefaultConfig 初始化默认配置.
 func (mm *MirrorManager) initDefaultConfig() {
 	mm.config = &SystemConfig{
-		CurrentMirror: "official",
-		CurrentCodex:  "official",
+		CurrentMirror: DefaultMirrorName,
+		CurrentCodex:  DefaultMirrorName,
 		Mirrors: []MirrorConfig{
 			{
-				Name:     "official",
+				Name:     DefaultMirrorName,
 				BaseURL:  "https://api.openai.com",
 				APIKey:   "",
 				ToolType: ToolTypeCodex,
@@ -110,7 +110,7 @@ func (mm *MirrorManager) AddMirrorWithType(name, baseURL, apiKey string, toolTyp
 	// 根据工具类型设置环境变量key
 	switch toolType {
 	case ToolTypeCodex:
-		newMirror.EnvKey = "CODEX_SWITCH_OPENAI_API_KEY" // Codex 固定使用专用的环境变量名
+		newMirror.EnvKey = CodexSwitchAPIKeyEnv // Codex 固定使用专用的环境变量名
 	case ToolTypeClaude:
 		newMirror.EnvKey = "ANTHROPIC_AUTH_TOKEN" // Claude 使用固定的环境变量名
 	}
@@ -129,7 +129,7 @@ func (mm *MirrorManager) AddMirrorWithType(name, baseURL, apiKey string, toolTyp
 
 // RemoveMirror 删除镜像源.
 func (mm *MirrorManager) RemoveMirror(name string) error {
-	if name == "official" {
+	if name == DefaultMirrorName {
 		return fmt.Errorf("不能删除官方镜像源")
 	}
 
@@ -137,10 +137,10 @@ func (mm *MirrorManager) RemoveMirror(name string) error {
 		if mirror.Name == name {
 			// 如果删除的是当前使用的镜像源，切换到官方镜像源
 			if mm.config.CurrentMirror == name {
-				mm.config.CurrentMirror = "official"
+				mm.config.CurrentMirror = DefaultMirrorName
 			}
 			if mm.config.CurrentCodex == name {
-				mm.config.CurrentCodex = "official"
+				mm.config.CurrentCodex = DefaultMirrorName
 			}
 			if mm.config.CurrentClaude == name {
 				mm.config.CurrentClaude = ""
@@ -248,7 +248,7 @@ func (mm *MirrorManager) FixEnvKeyFormat() error {
 		var expectedEnvKey string
 		switch mirror.ToolType {
 		case ToolTypeCodex:
-			expectedEnvKey = "CODEX_SWITCH_OPENAI_API_KEY" // Codex 固定使用专用的环境变量名
+			expectedEnvKey = CodexSwitchAPIKeyEnv // Codex 固定使用专用的环境变量名
 		case ToolTypeClaude:
 			expectedEnvKey = "ANTHROPIC_AUTH_TOKEN"
 		default:
@@ -305,7 +305,7 @@ func (mm *MirrorManager) discoverFromEnvironment() {
 			// 设置当前激活的配置
 			switch mirror.ToolType {
 			case ToolTypeCodex:
-				if mm.config.CurrentCodex == "official" {
+				if mm.config.CurrentCodex == DefaultMirrorName {
 					mm.config.CurrentCodex = name
 				}
 			case ToolTypeClaude:
@@ -315,7 +315,7 @@ func (mm *MirrorManager) discoverFromEnvironment() {
 			}
 
 			// 设置通用当前镜像源（兼容旧版本）
-			if mm.config.CurrentMirror == "official" && len(mm.config.Mirrors) > 1 {
+			if mm.config.CurrentMirror == DefaultMirrorName && len(mm.config.Mirrors) > 1 {
 				mm.config.CurrentMirror = name
 			}
 		}
@@ -323,7 +323,9 @@ func (mm *MirrorManager) discoverFromEnvironment() {
 
 	// 保存发现的配置
 	if len(discoveredMirrors) > 0 {
-		mm.saveConfig()
+		if err := mm.saveConfig(); err != nil {
+			fmt.Printf("保存配置失败: %v\n", err)
+		}
 	}
 }
 
@@ -356,7 +358,11 @@ func (mm *MirrorManager) discoverCodexFromConfig(discoveredMirrors map[string]Mi
 	if _, err := os.Stat(authPath); err == nil {
 		// 认证文件存在，读取 API 密钥
 		if file, err := os.Open(authPath); err == nil {
-			defer file.Close()
+			defer func() {
+				if closeErr := file.Close(); closeErr != nil {
+					fmt.Printf("关闭文件失败: %v\n", closeErr)
+				}
+			}()
 			if err := json.NewDecoder(file).Decode(&auth); err == nil {
 				// 成功读取认证信息
 			}
@@ -372,7 +378,7 @@ func (mm *MirrorManager) discoverCodexFromConfig(discoveredMirrors map[string]Mi
 			}
 
 			// 智能获取 API 密钥
-			apiKey := mm.getApiKeyForProvider(provider, auth)
+			apiKey := mm.getApiKeyForProvider(auth)
 
 			// 创建镜像源配置
 			mirror := MirrorConfig{
@@ -389,9 +395,9 @@ func (mm *MirrorManager) discoverCodexFromConfig(discoveredMirrors map[string]Mi
 }
 
 // getApiKeyForProvider 智能获取提供商的 API 密钥
-func (mm *MirrorManager) getApiKeyForProvider(provider ModelProviderConfig, auth CodexAuth) string {
+func (mm *MirrorManager) getApiKeyForProvider(auth CodexAuth) string {
 	// Codex 固定使用 CODEX_SWITCH_OPENAI_API_KEY 环境变量
-	envKey := "CODEX_SWITCH_OPENAI_API_KEY"
+	envKey := CodexSwitchAPIKeyEnv
 
 	// 1. 首先尝试从环境变量获取
 	if apiKey := os.Getenv(envKey); apiKey != "" {
@@ -507,7 +513,7 @@ func SanitizeEnvVarName(name string) string {
 	}, name)
 
 	// 确保不以数字开头
-	if len(sanitized) > 0 && sanitized[0] >= '0' && sanitized[0] <= '9' {
+	if sanitized != "" && sanitized[0] >= '0' && sanitized[0] <= '9' {
 		sanitized = "MIRROR_" + sanitized
 	}
 

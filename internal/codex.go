@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -61,7 +60,7 @@ func (ccm *CodexConfigManager) FixEnvKeyFormat() error {
 	// 检查并修复每个镜像源的env_key格式
 	updated := false
 	for name, provider := range config.ModelProviders {
-		expectedEnvKey := "CODEX_SWITCH_OPENAI_API_KEY" // Codex 固定使用专用的环境变量名
+		expectedEnvKey := CodexSwitchAPIKeyEnv // Codex 固定使用专用的环境变量名
 		if provider.EnvKey != expectedEnvKey {
 			provider.EnvKey = expectedEnvKey
 			config.ModelProviders[name] = provider
@@ -126,7 +125,7 @@ func (ccm *CodexConfigManager) UpdateConfig(mirror *MirrorConfig) error {
 			providerConfig.WireAPI = existingProvider.WireAPI
 		}
 		// 如果现有的env_key已经是正确的CODEX_前缀格式，保留它
-		expectedEnvKey := "CODEX_SWITCH_OPENAI_API_KEY" // Codex 固定使用专用的环境变量名
+		expectedEnvKey := CodexSwitchAPIKeyEnv // Codex 固定使用专用的环境变量名
 		if existingProvider.EnvKey == expectedEnvKey {
 			providerConfig.EnvKey = existingProvider.EnvKey
 		}
@@ -260,87 +259,13 @@ func (ccm *CodexConfigManager) setWindowsUserEnvVar(envKey, apiKey string) error
 // setMacUserEnvVar 在macOS中设置用户级环境变量.
 func (ccm *CodexConfigManager) setMacUserEnvVar(envKey, apiKey string) error {
 	shellFiles := []string{".zshrc"} // macOS 默认使用 zsh
-	return ccm.setUnixUserEnvVar(envKey, apiKey, shellFiles)
+	return setUnixUserEnvVar(envKey, apiKey, shellFiles)
 }
 
 // setLinuxUserEnvVar 在Linux中设置用户级环境变量.
 func (ccm *CodexConfigManager) setLinuxUserEnvVar(envKey, apiKey string) error {
 	shellFiles := []string{".bashrc", ".profile"} // bash (最常见), 通用profile.
-	return ccm.setUnixUserEnvVar(envKey, apiKey, shellFiles)
-}
-
-// setUnixUserEnvVar 在Unix系统（macOS和Linux）中设置用户级环境变量.
-func (ccm *CodexConfigManager) setUnixUserEnvVar(envKey, apiKey string, shellFileNames []string) error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("获取用户主目录失败: %v", err)
-	}
-
-	// 构建完整的文件路径
-	shellFiles := make([]string, len(shellFileNames))
-	for i, name := range shellFileNames {
-		shellFiles[i] = filepath.Join(homeDir, name)
-	}
-
-	envLine := fmt.Sprintf("export %s=%s", envKey, apiKey)
-	updated := false
-
-	for _, shellFile := range shellFiles {
-		if err := ccm.updateShellProfile(shellFile, envKey, envLine); err != nil {
-			fmt.Printf("警告: 更新 %s 失败: %v\n", shellFile, err)
-			continue
-		}
-		updated = true
-	}
-
-	if !updated {
-		return fmt.Errorf("无法更新任何shell配置文件")
-	}
-
-	fmt.Printf("✓ 环境变量 %s 已添加到shell配置文件\n", envKey)
-	return nil
-}
-
-// updateShellProfile 更新shell配置文件，添加或更新环境变量.
-func (ccm *CodexConfigManager) updateShellProfile(shellFile, envKey, envLine string) error {
-	// 读取现有内容
-	var existingContent []byte
-	var err error
-	if _, err = os.Stat(shellFile); err == nil {
-		existingContent, err = os.ReadFile(shellFile)
-		if err != nil {
-			return fmt.Errorf("读取文件失败: %v", err)
-		}
-	}
-
-	content := string(existingContent)
-	lines := strings.Split(content, "\n")
-
-	// 检查是否已存在该环境变量的设置
-	envPattern := fmt.Sprintf("export %s=", envKey)
-	found := false
-	for i, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), envPattern) {
-			// 更新现有行
-			lines[i] = envLine
-			found = true
-			break
-		}
-	}
-
-	// 如果没找到，添加新行
-	if !found {
-		// 合并多个append操作
-		lines = append(lines, "", "# Codex Mirror Switch - API Key.", envLine)
-	}
-
-	// 写回文件
-	newContent := strings.Join(lines, "\n")
-	if err := os.WriteFile(shellFile, []byte(newContent), 0o644); err != nil {
-		return fmt.Errorf("写入文件失败: %v", err)
-	}
-
-	return nil
+	return setUnixUserEnvVar(envKey, apiKey, shellFiles)
 }
 
 // ApplyMirror 应用镜像源配置到Codex CLI.

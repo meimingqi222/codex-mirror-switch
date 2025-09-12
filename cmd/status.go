@@ -138,7 +138,7 @@ func checkCodexStatus(mm *internal.MirrorManager) {
 	authMatch := auth.APIKey == currentCodex.APIKey
 
 	// 检查环境变量
-	envVarName := "CODEX_SWITCH_OPENAI_API_KEY" // Codex 固定使用专用的环境变量名
+	envVarName := internal.CodexSwitchAPIKeyEnv // Codex 固定使用专用的环境变量名
 	envKey := os.Getenv(envVarName)
 	envMatch := envKey == currentCodex.APIKey
 
