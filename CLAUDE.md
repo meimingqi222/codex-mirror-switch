@@ -77,7 +77,7 @@ Environment variables are persisted across platforms:
 ### Dependencies
 - `github.com/spf13/cobra` - CLI framework
 - `github.com/BurntSushi/toml` - TOML parsing
-- Go 1.24.4+ required
+- Go 1.23.12+ required (to match golangci-lint compatibility)
 
 ### Common Development Tasks
 1. Add new command: Create file in `cmd/`, register in `cmd/root.go`

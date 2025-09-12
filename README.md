@@ -275,7 +275,7 @@ codex-mirror-switch/
 
 ### 环境要求
 
-- Go 1.24 或更高版本
+- Go 1.23.12 或更高版本（为了与 golangci-lint 兼容）
 
 ### 构建
 

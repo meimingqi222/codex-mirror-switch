@@ -59,44 +59,17 @@ coverage: test
 	$(GO) tool cover -html=coverage.out -o coverage.html
 	@echo "覆盖率报告已生成: coverage.html"
 
-# 代码质量检查（与GitHub Actions保持一致）
+# 代码质量检查（使用golangci-lint）
 .PHONY: lint
 lint:
-	@echo "正在进行代码质量检查（与GitHub Actions保持一致）..."
-	@echo "运行 go vet..."
-	@$(GOVET) ./...
-	@echo "运行 go fmt 检查..."
-	@if [ "$$(gofmt -l . | wc -l)" -ne 0 ]; then \
-		echo "❌ 代码格式错误:"; \
-		gofmt -l .; \
-		echo "💡 请运行 'make fmt' 来格式化代码"; \
-		exit 1; \
+	@echo "正在进行代码质量检查..."
+	@echo "运行 golangci-lint..."
+	@if ! command -v golangci-lint >/dev/null 2>&1; then \
+		echo "安装 golangci-lint..."; \
+		$(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; \
 	fi
-	@echo "✅ 代码格式正确"
-	@echo "检查依赖..."
-	@$(GOMOD) tidy
-	@if [ -n "$$(git status --porcelain go.mod go.sum 2>/dev/null)" ]; then \
-		echo "❌ go.mod 或 go.sum 有未提交的更改"; \
-		git diff go.mod go.sum; \
-		exit 1; \
-	fi
-	@echo "✅ 依赖检查通过"
-	@echo "运行 revive..."
-	@if ! command -v revive >/dev/null 2>&1; then \
-		echo "使用 go run 运行 revive..."; \
-		$(GO) run github.com/mgechev/revive@latest ./...; \
-	else \
-		revive ./...; \
-	fi
-	@echo "✅ revive 检查通过"
-	@echo "运行 errcheck..."
-	@if ! command -v errcheck >/dev/null 2>&1; then \
-		echo "使用 go run 运行 errcheck..."; \
-		$(GO) run github.com/kisielk/errcheck@latest ./... || echo "⚠️  errcheck 暂时跳过（版本兼容性问题）"; \
-	else \
-		errcheck ./...; \
-	fi
-	@echo "✅ errcheck 检查通过"
+	@golangci-lint run ./...
+	@echo "✅ golangci-lint 检查通过"
 
 # 运行轻量级 lint 工具（可选）
 .PHONY: lint-light
