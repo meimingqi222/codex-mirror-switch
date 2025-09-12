@@ -197,7 +197,7 @@ func cleanupOldCodexEnvVars(lines []string) []string {
 
 		// 保留当前行
 		cleanedLines = append(cleanedLines, line)
-		i += 1
+		i++
 	}
 
 	return cleanedLines

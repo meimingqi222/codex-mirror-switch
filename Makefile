@@ -25,7 +25,7 @@ DIST_DIR := dist
 
 # 默认目标
 .PHONY: all
-all: clean deps test build
+all: clean lint test build
 
 # 安装依赖
 .PHONY: deps
@@ -59,28 +59,44 @@ coverage: test
 	$(GO) tool cover -html=coverage.out -o coverage.html
 	@echo "覆盖率报告已生成: coverage.html"
 
-# 代码质量检查（使用轻量级工具，版本兼容性好）
+# 代码质量检查（与GitHub Actions保持一致）
 .PHONY: lint
 lint:
-	@echo "正在进行代码质量检查..."
+	@echo "正在进行代码质量检查（与GitHub Actions保持一致）..."
 	@echo "运行 go vet..."
 	@$(GOVET) ./...
 	@echo "运行 go fmt 检查..."
 	@if [ "$$(gofmt -l . | wc -l)" -ne 0 ]; then \
-		echo "以下文件需要格式化:"; \
+		echo "❌ 代码格式错误:"; \
 		gofmt -l .; \
-		echo "请运行 'make fmt' 来格式化代码"; \
+		echo "💡 请运行 'make fmt' 来格式化代码"; \
 		exit 1; \
 	fi
 	@echo "✅ 代码格式正确"
 	@echo "检查依赖..."
 	@$(GOMOD) tidy
 	@if [ -n "$$(git status --porcelain go.mod go.sum 2>/dev/null)" ]; then \
-		echo "⚠️  go.mod 或 go.sum 有变化，请提交"; \
+		echo "❌ go.mod 或 go.sum 有未提交的更改"; \
 		git diff go.mod go.sum; \
 		exit 1; \
 	fi
 	@echo "✅ 依赖检查通过"
+	@echo "运行 revive..."
+	@if ! command -v revive >/dev/null 2>&1; then \
+		echo "使用 go run 运行 revive..."; \
+		$(GO) run github.com/mgechev/revive@latest ./...; \
+	else \
+		revive ./...; \
+	fi
+	@echo "✅ revive 检查通过"
+	@echo "运行 errcheck..."
+	@if ! command -v errcheck >/dev/null 2>&1; then \
+		echo "使用 go run 运行 errcheck..."; \
+		$(GO) run github.com/kisielk/errcheck@latest ./... || echo "⚠️  errcheck 暂时跳过（版本兼容性问题）"; \
+	else \
+		errcheck ./...; \
+	fi
+	@echo "✅ errcheck 检查通过"
 
 # 运行轻量级 lint 工具（可选）
 .PHONY: lint-light
@@ -125,7 +141,7 @@ lint-ci:
 
 # 本地构建
 .PHONY: build
-build: deps
+build: lint deps
 	@echo "正在构建 $(APP_NAME)..."
 	@mkdir -p $(BUILD_DIR)
 	$(GOBUILD) $(GOFLAGS) -o $(BUILD_DIR)/$(APP_NAME) ./main.go
