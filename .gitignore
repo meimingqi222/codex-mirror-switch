@@ -69,4 +69,4 @@ codex-mirror.exe
 codex-mirror
 *.toml.backup
 .trae/
-.claude/
+test_clean.txt

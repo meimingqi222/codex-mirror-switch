@@ -1,1 +1,0 @@
-# Test that clean commits work
