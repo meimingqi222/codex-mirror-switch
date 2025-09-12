@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"codex-mirror/internal"
 
@@ -13,7 +14,7 @@ var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "显示当前配置状态",
 	Long: `显示当前镜像源配置状态，包括：
-- 当前使用的镜像源
+- Claude Code配置状态
 - Codex CLI配置状态
 - VS Code配置状态
 
@@ -27,39 +28,83 @@ var statusCmd = &cobra.Command{
 			return
 		}
 
-		// 获取当前镜像源
-		currentMirror, err := mm.GetCurrentMirror()
-		if err != nil {
-			fmt.Printf("获取当前镜像源失败: %v\n", err)
-			return
-		}
-
 		fmt.Println("当前配置状态:")
 		fmt.Println("==================================================")
 
-		// 显示当前镜像源信息
-		fmt.Printf("当前镜像源: %s\n", currentMirror.Name)
-		fmt.Printf("  URL: %s\n", currentMirror.BaseURL)
-		if currentMirror.APIKey != "" {
-			fmt.Printf("  API密钥: %s\n", maskAPIKey(currentMirror.APIKey))
-		} else {
-			fmt.Printf("  API密钥: 未设置\n")
-		}
+		// 检查Claude Code配置状态
+		fmt.Println("Claude Code配置:")
+		checkClaudeStatus(mm)
 		fmt.Println()
 
 		// 检查Codex CLI配置状态
 		fmt.Println("Codex CLI配置:")
-		checkCodexStatus(currentMirror)
+		checkCodexStatus(mm)
 		fmt.Println()
 
 		// 检查VS Code配置状态
 		fmt.Println("VS Code配置:")
-		checkVSCodeStatus(currentMirror)
+		checkVSCodeStatus(mm)
 	},
 }
 
+// checkClaudeStatus 检查Claude配置状态.
+func checkClaudeStatus(mm *internal.MirrorManager) {
+	// 获取当前激活的Claude配置
+	currentClaude, err := mm.GetCurrentClaudeMirror()
+	if err != nil {
+		fmt.Printf("  ❌ 未设置Claude配置: %v\n", err)
+		return
+	}
+
+	fmt.Printf("  当前配置: %s\n", currentClaude.Name)
+	fmt.Printf("  API端点: %s\n", currentClaude.BaseURL)
+
+	// 检查环境变量
+	baseURL := ""
+	authToken := ""
+
+	if envURL := os.Getenv("ANTHROPIC_BASE_URL"); envURL != "" {
+		baseURL = envURL
+	}
+	if envToken := os.Getenv("ANTHROPIC_AUTH_TOKEN"); envToken != "" {
+		authToken = envToken
+	}
+
+	// 比较环境变量
+	urlMatch := baseURL == currentClaude.BaseURL
+	tokenMatch := authToken == currentClaude.APIKey
+
+	fmt.Printf("  环境变量 ANTHROPIC_BASE_URL: ")
+	if baseURL == "" {
+		fmt.Printf("❌ 未设置\n")
+	} else if urlMatch {
+		fmt.Printf("✓ 正确\n")
+	} else {
+		fmt.Printf("⚠️  不匹配 (当前: %s, 期望: %s)\n", baseURL, currentClaude.BaseURL)
+	}
+
+	fmt.Printf("  环境变量 ANTHROPIC_AUTH_TOKEN: ")
+	if authToken == "" {
+		fmt.Printf("❌ 未设置\n")
+	} else if tokenMatch {
+		fmt.Printf("✓ 正确\n")
+	} else {
+		fmt.Printf("⚠️  不匹配\n")
+	}
+}
+
 // checkCodexStatus 检查Codex配置状态.
-func checkCodexStatus(expectedMirror *internal.MirrorConfig) {
+func checkCodexStatus(mm *internal.MirrorManager) {
+	// 获取当前激活的Codex配置
+	currentCodex, err := mm.GetCurrentCodexMirror()
+	if err != nil {
+		fmt.Printf("  ❌ 未设置Codex配置: %v\n", err)
+		return
+	}
+
+	fmt.Printf("  当前配置: %s\n", currentCodex.Name)
+	fmt.Printf("  API端点: %s\n", currentCodex.BaseURL)
+
 	ccm, err := internal.NewCodexConfigManager()
 	if err != nil {
 		fmt.Printf("  ❌ 无法访问Codex配置: %v\n", err)
@@ -83,30 +128,53 @@ func checkCodexStatus(expectedMirror *internal.MirrorConfig) {
 	// 获取当前镜像源的base_url
 	currentBaseURL := ""
 	if config.ModelProviders != nil {
-		if provider, exists := config.ModelProviders[expectedMirror.Name]; exists {
+		if provider, exists := config.ModelProviders[currentCodex.Name]; exists {
 			currentBaseURL = provider.BaseURL
 		}
 	}
 
 	// 比较配置
-	configMatch := currentBaseURL == expectedMirror.BaseURL
-	authMatch := auth.APIKey == expectedMirror.APIKey
+	configMatch := currentBaseURL == currentCodex.BaseURL
+	authMatch := auth.APIKey == currentCodex.APIKey
 
-	if configMatch && authMatch {
-		fmt.Println("  ✓ 配置正确")
+	// 检查环境变量
+	envVarName := "CODEX_SWITCH_OPENAI_API_KEY" // Codex 固定使用专用的环境变量名
+	envKey := os.Getenv(envVarName)
+	envMatch := envKey == currentCodex.APIKey
+
+	fmt.Printf("  配置文件 (~/.codex/config.toml): ")
+	if configMatch {
+		fmt.Printf("✓ 正确\n")
 	} else {
-		fmt.Println("  ⚠️  配置不匹配")
-		if !configMatch {
-			fmt.Printf("    配置文件URL: %s (期望: %s)\n", currentBaseURL, expectedMirror.BaseURL)
-		}
-		if !authMatch {
-			fmt.Printf("    认证文件API密钥不匹配\n")
-		}
+		fmt.Printf("⚠️  不匹配 (当前: %s)\n", currentBaseURL)
+	}
+
+	fmt.Printf("  认证文件 (~/.codex/auth.json): ")
+	if authMatch {
+		fmt.Printf("✓ 正确\n")
+	} else {
+		fmt.Printf("⚠️  不匹配\n")
+	}
+
+	fmt.Printf("  环境变量 %s: ", envVarName)
+	if envKey == "" {
+		fmt.Printf("❌ 未设置\n")
+	} else if envMatch {
+		fmt.Printf("✓ 正确\n")
+	} else {
+		fmt.Printf("⚠️  不匹配\n")
 	}
 }
 
 // checkVSCodeStatus 检查VS Code配置状态.
-func checkVSCodeStatus(expectedMirror *internal.MirrorConfig) {
+func checkVSCodeStatus(mm *internal.MirrorManager) {
+	// 获取当前激活的Codex配置（VS Code通常与Codex配置相同）
+	currentCodex, err := mm.GetCurrentCodexMirror()
+	if err != nil {
+		fmt.Printf("  ❌ 未设置Codex配置，无法检查VS Code配置: %v\n", err)
+		return
+	}
+
 	vcm, err := internal.NewVSCodeConfigManager()
 	if err != nil {
 		fmt.Printf("  ❌ 无法访问VS Code配置: %v\n", err)
@@ -122,36 +190,22 @@ func checkVSCodeStatus(expectedMirror *internal.MirrorConfig) {
 
 	// 检查配置
 	apiBaseMatch := false
-	configMatch := false
 
 	if apiBase, exists := config["apiBase"]; exists {
 		if apiBaseStr, ok := apiBase.(string); ok {
-			apiBaseMatch = apiBaseStr == expectedMirror.BaseURL
-		}
-	}
-
-	if chatgptConfig, exists := config["config"]; exists {
-		if configMap, ok := chatgptConfig.(map[string]interface{}); ok {
-			if apiBaseUrl, exists := configMap["apiBaseUrl"]; exists {
-				if apiBaseUrlStr, ok := apiBaseUrl.(string); ok {
-					configMatch = apiBaseUrlStr == expectedMirror.BaseURL
-				}
-			}
+			apiBaseMatch = apiBaseStr == currentCodex.BaseURL
 		}
 	}
 
 	switch {
-	case apiBaseMatch && configMatch:
-		fmt.Println("  ✓ 配置正确")
+	case apiBaseMatch:
+		fmt.Printf("  ✓ 配置正确 (chatgpt.apiBase: %s)\n", currentCodex.BaseURL)
 	case len(config) == 0:
 		fmt.Println("  ⚠️  未配置ChatGPT插件")
 	default:
 		fmt.Println("  ⚠️  配置不匹配")
 		if !apiBaseMatch {
 			fmt.Printf("    chatgpt.apiBase不匹配\n")
-		}
-		if !configMatch {
-			fmt.Printf("    chatgpt.config.apiBaseUrl不匹配\n")
 		}
 	}
 }

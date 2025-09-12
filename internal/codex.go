@@ -61,7 +61,7 @@ func (ccm *CodexConfigManager) FixEnvKeyFormat() error {
 	// 检查并修复每个镜像源的env_key格式
 	updated := false
 	for name, provider := range config.ModelProviders {
-		expectedEnvKey := fmt.Sprintf("CODEX_%s_API_KEY", strings.ToUpper(name))
+		expectedEnvKey := "CODEX_SWITCH_OPENAI_API_KEY" // Codex 固定使用专用的环境变量名
 		if provider.EnvKey != expectedEnvKey {
 			provider.EnvKey = expectedEnvKey
 			config.ModelProviders[name] = provider
@@ -126,7 +126,7 @@ func (ccm *CodexConfigManager) UpdateConfig(mirror *MirrorConfig) error {
 			providerConfig.WireAPI = existingProvider.WireAPI
 		}
 		// 如果现有的env_key已经是正确的CODEX_前缀格式，保留它
-		expectedEnvKey := fmt.Sprintf("CODEX_%s_API_KEY", strings.ToUpper(mirror.Name))
+		expectedEnvKey := "CODEX_SWITCH_OPENAI_API_KEY" // Codex 固定使用专用的环境变量名
 		if existingProvider.EnvKey == expectedEnvKey {
 			providerConfig.EnvKey = existingProvider.EnvKey
 		}
@@ -259,7 +259,7 @@ func (ccm *CodexConfigManager) setWindowsUserEnvVar(envKey, apiKey string) error
 
 // setMacUserEnvVar 在macOS中设置用户级环境变量.
 func (ccm *CodexConfigManager) setMacUserEnvVar(envKey, apiKey string) error {
-	shellFiles := []string{".zshrc", ".bash_profile"} // zsh (macOS 默认), bash.
+	shellFiles := []string{".zshrc"} // macOS 默认使用 zsh
 	return ccm.setUnixUserEnvVar(envKey, apiKey, shellFiles)
 }
 

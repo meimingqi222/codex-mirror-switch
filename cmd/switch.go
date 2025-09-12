@@ -19,19 +19,18 @@ var (
 var switchCmd = &cobra.Command{
 	Use:   "switch [name]",
 	Short: "切换到指定的镜像源",
-	Long: `切换到指定的镜像源，并更新相关配置文件。
+	Long: `切换到指定的镜像源，并根据配置类型自动处理。
 
-默认情况下，会同时更新Codex CLI和VS Code的配置。
-可以使用标志来只更新特定的配置。
+Claude 配置：只设置环境变量 (ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN)
+Codex 配置：修改配置文件并设置环境变量
 
 参数：
   name  要切换到的镜像源名称
 
 示例：
-  codex-mirror switch myapi
-  codex-mirror switch official --codex-only
-  codex-mirror switch local --vscode-only
-  codex-mirror switch myapi --no-backup`,
+  codex-mirror switch myclaude
+  codex-mirror switch mycodex
+  codex-mirror switch mycodex --no-backup`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		mirrorName := args[0]
@@ -49,45 +48,77 @@ var switchCmd = &cobra.Command{
 			return
 		}
 
-		// 切换镜像源
-		if err := mm.SwitchMirror(mirrorName); err != nil {
-			fmt.Printf("切换镜像源失败: %v\n", err)
-			return
-		}
-
-		// 获取镜像源配置
-		mirror, err := mm.GetCurrentMirror()
+		// 获取目标镜像源配置
+		mirror, err := mm.GetMirrorByName(mirrorName)
 		if err != nil {
 			fmt.Printf("获取镜像源配置失败: %v\n", err)
 			return
 		}
 
-		fmt.Printf("正在切换到镜像源 '%s'...\n", mirrorName)
+		fmt.Printf("正在切换到镜像源 '%s' (%s)...\n", mirrorName, mirror.ToolType)
 
-		// 更新Codex CLI配置
-		if !vscodeOnly {
-			if err := updateCodexConfig(mirror); err != nil {
-				fmt.Printf("更新Codex配置失败: %v\n", err)
+		// 根据工具类型应用配置
+		switch mirror.ToolType {
+		case internal.ToolTypeClaude:
+			if err := applyClaudeConfig(mirror); err != nil {
+				fmt.Printf("应用Claude配置失败: %v\n", err)
 				return
 			}
-			fmt.Println("✓ Codex CLI配置已更新")
+		case internal.ToolTypeCodex:
+			if err := applyCodexConfig(mirror); err != nil {
+				fmt.Printf("应用Codex配置失败: %v\n", err)
+				return
+			}
+		default:
+			fmt.Printf("错误: 不支持的配置类型 '%s'\n", mirror.ToolType)
+			return
 		}
 
-		// 更新VS Code配置
-		if !codexOnly {
-			if err := updateVSCodeConfig(mirror); err != nil {
-				fmt.Printf("更新VS Code配置失败: %v\n", err)
-				return
-			}
-			fmt.Println("✓ VS Code配置已更新")
+		// 切换镜像源状态
+		if err := mm.SwitchMirror(mirrorName); err != nil {
+			fmt.Printf("切换镜像源状态失败: %v\n", err)
+			return
 		}
 
 		fmt.Printf("\n成功切换到镜像源 '%s'\n", mirrorName)
+		fmt.Printf("  类型: %s\n", mirror.ToolType)
 		fmt.Printf("  URL: %s\n", mirror.BaseURL)
 		if mirror.APIKey != "" {
 			fmt.Printf("  API密钥: %s\n", maskAPIKey(mirror.APIKey))
 		}
 	},
+}
+
+// applyClaudeConfig 应用Claude配置（只设置环境变量）.
+func applyClaudeConfig(mirror *internal.MirrorConfig) error {
+	envManager := internal.NewEnvManager()
+
+	// 设置 Claude 环境变量
+	if err := envManager.SetClaudeEnvVars(mirror.BaseURL, mirror.APIKey); err != nil {
+		return err
+	}
+
+	fmt.Println("✓ Claude Code环境变量已设置")
+	return nil
+}
+
+// applyCodexConfig 应用Codex配置（修改配置文件并设置环境变量）.
+func applyCodexConfig(mirror *internal.MirrorConfig) error {
+	// 更新Codex CLI配置
+	if err := updateCodexConfig(mirror); err != nil {
+		return err
+	}
+	fmt.Println("✓ Codex CLI配置已更新")
+
+	// 更新VS Code配置
+	if !vscodeOnly {
+		if err := updateVSCodeConfig(mirror); err != nil {
+			return err
+		}
+		fmt.Println("✓ VS Code配置已更新")
+	}
+
+	return nil
 }
 
 // updateCodexConfig 更新Codex配置.

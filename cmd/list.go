@@ -13,7 +13,7 @@ import (
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "列出所有镜像源",
-	Long: `列出所有已配置的镜像源，并显示当前使用的镜像源。
+	Long: `列出所有已配置的镜像源，并显示当前激活的配置。
 
 示例：
   codex-mirror list`,
@@ -32,33 +32,52 @@ var listCmd = &cobra.Command{
 			return
 		}
 
-		// 获取当前镜像源
-		currentMirror, err := mm.GetCurrentMirror()
-		if err != nil {
-			fmt.Printf("获取当前镜像源失败: %v\n", err)
-			return
-		}
+		// 获取当前激活的配置
+		currentCodex, _ := mm.GetCurrentCodexMirror()
+		currentClaude, _ := mm.GetCurrentClaudeMirror()
 
 		fmt.Println("可用的镜像源:")
-		fmt.Println(strings.Repeat("-", 60))
+		fmt.Println(strings.Repeat("-", 70))
+		fmt.Printf("%-20s %-10s %-40s %s\n", "名称", "类型", "URL", "状态")
+		fmt.Println(strings.Repeat("-", 70))
 
 		for _, mirror := range mirrors {
-			prefix := "  "
-			if mirror.Name == currentMirror.Name {
-				prefix = "* " // 标记当前使用的镜像源.
+			// 确定状态
+			status := ""
+			if mirror.ToolType == internal.ToolTypeCodex && currentCodex != nil && mirror.Name == currentCodex.Name {
+				status = "✓"
+			} else if mirror.ToolType == internal.ToolTypeClaude && currentClaude != nil && mirror.Name == currentClaude.Name {
+				status = "✓"
 			}
 
-			fmt.Printf("%s%s\n", prefix, mirror.Name)
-			fmt.Printf("    URL: %s\n", mirror.BaseURL)
-			if mirror.APIKey != "" {
-				fmt.Printf("    API密钥: %s\n", maskAPIKey(mirror.APIKey))
-			} else {
-				fmt.Printf("    API密钥: 未设置\n")
+			// 截断过长的URL
+			url := mirror.BaseURL
+			if len(url) > 38 {
+				url = url[:35] + "..."
 			}
-			fmt.Println()
+
+			fmt.Printf("%-20s %-10s %-40s %s\n",
+				mirror.Name,
+				mirror.ToolType,
+				url,
+				status)
 		}
 
-		fmt.Printf("当前使用: %s\n", currentMirror.Name)
+		fmt.Println(strings.Repeat("-", 70))
+
+		// 显示当前激活的配置
+		fmt.Println("\n当前激活的配置:")
+		if currentCodex != nil {
+			fmt.Printf("  Codex:  %s (%s)\n", currentCodex.Name, currentCodex.BaseURL)
+		} else {
+			fmt.Printf("  Codex:  未设置\n")
+		}
+
+		if currentClaude != nil {
+			fmt.Printf("  Claude: %s (%s)\n", currentClaude.Name, currentClaude.BaseURL)
+		} else {
+			fmt.Printf("  Claude: 未设置\n")
+		}
 	},
 }
 

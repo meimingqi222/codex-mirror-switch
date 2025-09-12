@@ -1,16 +1,27 @@
 package internal
 
+// ToolType 工具类型.
+type ToolType string
+
+const (
+	ToolTypeCodex  ToolType = "codex"
+	ToolTypeClaude ToolType = "claude"
+)
+
 // MirrorConfig 镜像源配置结构.
 type MirrorConfig struct {
-	Name    string `json:"name" toml:"name"`         // 镜像源名称
-	BaseURL string `json:"base_url" toml:"base_url"` // API基础URL.
-	APIKey  string `json:"api_key" toml:"api_key"`   // API密钥.
-	EnvKey  string `json:"env_key" toml:"env_key"`   // 环境变量key
+	Name     string   `json:"name" toml:"name"`           // 镜像源名称
+	BaseURL  string   `json:"base_url" toml:"base_url"`   // API基础URL.
+	APIKey   string   `json:"api_key" toml:"api_key"`     // API密钥.
+	EnvKey   string   `json:"env_key" toml:"env_key"`     // 环境变量key
+	ToolType ToolType `json:"tool_type" toml:"tool_type"` // 工具类型
 }
 
 // SystemConfig 系统配置结构.
 type SystemConfig struct {
-	CurrentMirror string         `json:"current_mirror" toml:"current_mirror"` // 当前使用的镜像源
+	CurrentMirror string         `json:"current_mirror" toml:"current_mirror"` // 当前使用的镜像源（兼容旧版本）
+	CurrentCodex  string         `json:"current_codex" toml:"current_codex"`   // 当前使用的 Codex 镜像源
+	CurrentClaude string         `json:"current_claude" toml:"current_claude"` // 当前使用的 Claude 镜像源
 	Mirrors       []MirrorConfig `json:"mirrors" toml:"mirrors"`               // 可用镜像源列表
 }
 
