@@ -10,11 +10,12 @@ const (
 
 // MirrorConfig 镜像源配置结构.
 type MirrorConfig struct {
-	Name     string   `json:"name" toml:"name"`           // 镜像源名称
-	BaseURL  string   `json:"base_url" toml:"base_url"`   // API基础URL.
-	APIKey   string   `json:"api_key" toml:"api_key"`     // API密钥.
-	EnvKey   string   `json:"env_key" toml:"env_key"`     // 环境变量key
-	ToolType ToolType `json:"tool_type" toml:"tool_type"` // 工具类型
+	Name      string   `json:"name" toml:"name"`             // 镜像源名称
+	BaseURL   string   `json:"base_url" toml:"base_url"`     // API基础URL.
+	APIKey    string   `json:"api_key" toml:"api_key"`       // API密钥.
+	EnvKey    string   `json:"env_key" toml:"env_key"`       // 环境变量key
+	ToolType  ToolType `json:"tool_type" toml:"tool_type"`   // 工具类型
+	ModelName string   `json:"model_name,omitempty" toml:"model_name,omitempty"` // 模型名称 (可选，主要用于Claude)
 }
 
 // SystemConfig 系统配置结构.
@@ -76,6 +77,7 @@ const (
 	CodexSwitchAPIKeyEnv  = "CODEX_SWITCH_OPENAI_API_KEY"
 	AnthropicBaseURLEnv   = "ANTHROPIC_BASE_URL"
 	AnthropicAuthTokenEnv = "ANTHROPIC_AUTH_TOKEN"
+	AnthropicModelEnv     = "ANTHROPIC_MODEL"
 
 	// 默认镜像源名称.
 	DefaultMirrorName = "official"

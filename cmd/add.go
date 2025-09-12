@@ -21,10 +21,12 @@ var addCmd = &cobra.Command{
 
 标志：
   --type   工具类型 (codex|claude, 默认: codex)
+  --model  模型名称 (可选，主Claude使用，如 claude-3-5-sonnet-20241022)
 
 示例：
   codex-mirror add myapi https://api.example.com sk-1234567890
   codex-mirror add myclaude https://api.anthropic.com sk-ant-123 --type claude
+  codex-mirror add custom https://api.custom.com sk-key --type claude --model claude-3-5-sonnet-20241022
   codex-mirror add local http://localhost:8080`,
 	Args: cobra.RangeArgs(2, 3),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -40,6 +42,9 @@ var addCmd = &cobra.Command{
 		if toolType == "" {
 			toolType = "codex" // 默认为 codex
 		}
+
+		// 获取模型名称
+		modelName, _ := cmd.Flags().GetString("model")
 
 		// 验证工具类型
 		var internalToolType internal.ToolType
@@ -61,7 +66,7 @@ var addCmd = &cobra.Command{
 		}
 
 		// 添加镜像源
-		if err := mm.AddMirrorWithType(name, baseURL, apiKey, internalToolType); err != nil {
+		if err := mm.AddMirrorWithModel(name, baseURL, apiKey, internalToolType, modelName); err != nil {
 			fmt.Printf("添加镜像源失败: %v\n", err)
 			return
 		}
@@ -73,10 +78,14 @@ var addCmd = &cobra.Command{
 		if apiKey != "" {
 			fmt.Printf("  API密钥: %s\n", maskAPIKey(apiKey))
 		}
+		if modelName != "" {
+			fmt.Printf("  模型: %s\n", modelName)
+		}
 	},
 }
 
 func init() {
 	addCmd.Flags().StringP("type", "t", "codex", "工具类型 (codex|claude)")
+	addCmd.Flags().StringP("model", "m", "", "模型名称 (可选，主Claude使用)")
 	rootCmd.AddCommand(addCmd)
 }

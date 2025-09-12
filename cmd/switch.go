@@ -93,12 +93,16 @@ Codex 配置：修改配置文件并设置环境变量
 func applyClaudeConfig(mirror *internal.MirrorConfig) error {
 	envManager := internal.NewEnvManager()
 
-	// 设置 Claude 环境变量
-	if err := envManager.SetClaudeEnvVars(mirror.BaseURL, mirror.APIKey); err != nil {
+	// 设置 Claude 环境变量（包括可选的模型名称）
+	if err := envManager.SetClaudeEnvVarsWithModel(mirror.BaseURL, mirror.APIKey, mirror.ModelName); err != nil {
 		return err
 	}
 
+	// 显示设置的环境变量
 	fmt.Println("✓ Claude Code环境变量已设置")
+	if mirror.ModelName != "" {
+		fmt.Printf("  模型: %s\n", mirror.ModelName)
+	}
 	return nil
 }
 

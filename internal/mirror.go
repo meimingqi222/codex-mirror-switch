@@ -92,6 +92,11 @@ func (mm *MirrorManager) AddMirror(name, baseURL, apiKey string) error {
 
 // AddMirrorWithType 添加指定类型的镜像源.
 func (mm *MirrorManager) AddMirrorWithType(name, baseURL, apiKey string, toolType ToolType) error {
+	return mm.AddMirrorWithModel(name, baseURL, apiKey, toolType, "")
+}
+
+// AddMirrorWithModel 添加指定类型和模型名称的镜像源.
+func (mm *MirrorManager) AddMirrorWithModel(name, baseURL, apiKey string, toolType ToolType, modelName string) error {
 	// 检查镜像源是否已存在
 	for _, mirror := range mm.config.Mirrors {
 		if mirror.Name == name {
@@ -101,10 +106,11 @@ func (mm *MirrorManager) AddMirrorWithType(name, baseURL, apiKey string, toolTyp
 
 	// 添加新镜像源
 	newMirror := MirrorConfig{
-		Name:     name,
-		BaseURL:  baseURL,
-		APIKey:   apiKey,
-		ToolType: toolType,
+		Name:      name,
+		BaseURL:   baseURL,
+		APIKey:    apiKey,
+		ToolType:  toolType,
+		ModelName: modelName,
 	}
 
 	// 根据工具类型设置环境变量key

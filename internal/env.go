@@ -18,17 +18,33 @@ func NewEnvManager() *EnvManager {
 
 // SetClaudeEnvVars 设置 Claude Code 环境变量.
 func (em *EnvManager) SetClaudeEnvVars(baseURL, authToken string) error {
-	// 设置 ANTHROPIC_BASE_URL
-	if err := em.setEnvironmentVariable(AnthropicBaseURLEnv, baseURL); err != nil {
+	return em.SetClaudeEnvVarsWithModel(baseURL, authToken, "")
+}
+
+// SetClaudeEnvVarsWithModel 设置 Claude Code 环境变量（包括可选的模型名称）.
+func (em *EnvManager) SetClaudeEnvVarsWithModel(baseURL, authToken, modelName string) error {
+	// 设置 ANTHROPIC_BASE_URL (不显示刷新提示)
+	if err := em.setEnvironmentVariableNoRefresh(AnthropicBaseURLEnv, baseURL); err != nil {
 		return fmt.Errorf("设置 ANTHROPIC_BASE_URL 失败: %v", err)
 	}
 
-	// 设置 ANTHROPIC_AUTH_TOKEN
-	if err := em.setEnvironmentVariable(AnthropicAuthTokenEnv, authToken); err != nil {
+	// 设置 ANTHROPIC_AUTH_TOKEN (不显示刷新提示)
+	if err := em.setEnvironmentVariableNoRefresh(AnthropicAuthTokenEnv, authToken); err != nil {
 		return fmt.Errorf("设置 ANTHROPIC_AUTH_TOKEN 失败: %v", err)
 	}
 
-	return nil
+	// 设置 ANTHROPIC_MODEL (可选)
+	if modelName != "" {
+		if err := em.setEnvironmentVariableNoRefresh(AnthropicModelEnv, modelName); err != nil {
+			return fmt.Errorf("设置 ANTHROPIC_MODEL 失败: %v", err)
+		}
+	} else {
+		// 如果模型名称为空，尝试清除现有的 ANTHROPIC_MODEL 环境变量
+		em.unsetEnvironmentVariable(AnthropicModelEnv)
+	}
+
+	// 一次性显示刷新提示
+	return em.showRefreshInstructions()
 }
 
 // SetCodexEnvVar 设置 Codex 环境变量.
@@ -42,6 +58,14 @@ func (em *EnvManager) SetCodexEnvVar(envKey, apiKey string) error {
 
 // setEnvironmentVariable 设置环境变量（跨平台）.
 func (em *EnvManager) setEnvironmentVariable(envKey, value string) error {
+	if err := em.setEnvironmentVariableNoRefresh(envKey, value); err != nil {
+		return err
+	}
+	return em.showRefreshInstructions()
+}
+
+// setEnvironmentVariableNoRefresh 设置环境变量（不显示刷新提示）.
+func (em *EnvManager) setEnvironmentVariableNoRefresh(envKey, value string) error {
 	// 在当前进程中设置环境变量
 	if err := os.Setenv(envKey, value); err != nil {
 		return fmt.Errorf("设置环境变量 %s 失败: %v", envKey, err)
@@ -52,11 +76,11 @@ func (em *EnvManager) setEnvironmentVariable(envKey, value string) error {
 	var err error
 	switch platform {
 	case PlatformWindows:
-		err = em.setWindowsUserEnvVar(envKey, value)
+		err = em.setWindowsUserEnvVarNoRefresh(envKey, value)
 	case PlatformMac:
-		err = em.setMacUserEnvVar(envKey, value)
+		err = em.setMacUserEnvVarNoRefresh(envKey, value)
 	case PlatformLinux:
-		err = em.setLinuxUserEnvVar(envKey, value)
+		err = em.setLinuxUserEnvVarNoRefresh(envKey, value)
 	}
 
 	if err != nil {
@@ -68,6 +92,16 @@ func (em *EnvManager) setEnvironmentVariable(envKey, value string) error {
 
 // setWindowsUserEnvVar 在 Windows 中设置用户级环境变量.
 func (em *EnvManager) setWindowsUserEnvVar(envKey, value string) error {
+	if err := em.setWindowsUserEnvVarNoRefresh(envKey, value); err != nil {
+		return err
+	}
+	fmt.Println("\n📝 环境变量已设置")
+	fmt.Println("🔄 请重新启动终端或注销重新登录以应用更改")
+	return nil
+}
+
+// setWindowsUserEnvVarNoRefresh 在 Windows 中设置用户级环境变量（不显示刷新提示）.
+func (em *EnvManager) setWindowsUserEnvVarNoRefresh(envKey, value string) error {
 	// 使用 setx 命令设置用户级环境变量
 	cmd := exec.Command("setx", envKey, value)
 	output, err := cmd.CombinedOutput()
@@ -80,12 +114,28 @@ func (em *EnvManager) setWindowsUserEnvVar(envKey, value string) error {
 
 // setMacUserEnvVar 在 macOS 中设置用户级环境变量.
 func (em *EnvManager) setMacUserEnvVar(envKey, value string) error {
+	if err := em.setMacUserEnvVarNoRefresh(envKey, value); err != nil {
+		return err
+	}
+	return em.showRefreshInstructions()
+}
+
+// setMacUserEnvVarNoRefresh 在 macOS 中设置用户级环境变量（不显示刷新提示）.
+func (em *EnvManager) setMacUserEnvVarNoRefresh(envKey, value string) error {
 	shellFiles := []string{".zshrc"} // macOS 默认使用 zsh
 	return setUnixUserEnvVar(envKey, value, shellFiles)
 }
 
 // setLinuxUserEnvVar 在 Linux 中设置用户级环境变量.
 func (em *EnvManager) setLinuxUserEnvVar(envKey, value string) error {
+	if err := em.setLinuxUserEnvVarNoRefresh(envKey, value); err != nil {
+		return err
+	}
+	return em.showRefreshInstructions()
+}
+
+// setLinuxUserEnvVarNoRefresh 在 Linux 中设置用户级环境变量（不显示刷新提示）.
+func (em *EnvManager) setLinuxUserEnvVarNoRefresh(envKey, value string) error {
 	shellFiles := []string{".bashrc", ".profile"} // bash (最常见), 通用 profile
 	return setUnixUserEnvVar(envKey, value, shellFiles)
 }
@@ -216,4 +266,129 @@ func shouldCleanupEnvVar(line string) bool {
 	}
 
 	return false
+}
+
+// unsetEnvironmentVariable 清除环境变量(适用于可选变量).
+func (em *EnvManager) unsetEnvironmentVariable(envKey string) {
+	// 从OSS进程中移除环境变量
+	os.Unsetenv(envKey)
+	
+	// 从配置文件中移除环境变量定义
+	platform := GetCurrentPlatform()
+	var shellFiles []string
+	
+	switch platform {
+	case PlatformWindows:
+		// Windows 在这里不删除环境变量，需要用户手动从系统设置中移除
+		return
+	case PlatformMac:
+		shellFiles = []string{".zshrc"}
+	case PlatformLinux:
+		shellFiles = []string{".bashrc", ".profile"}
+	}
+	
+	// 从所有 shell 配置文件中移除环境变量
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		// 如果无法获取主目录，就直接跳过
+		return
+	}
+	
+	for _, shellFileName := range shellFiles {
+		shellFile := filepath.Join(homeDir, shellFileName)
+		if _, err := os.Stat(shellFile); os.IsNotExist(err) {
+			continue
+		}
+		
+		// 读取文件内容
+		content, err := os.ReadFile(shellFile)
+		if err != nil {
+			// 如果读取失败，跳过这个文件
+			continue
+		}
+		
+		// 分行处理
+		lines := strings.Split(string(content), "\n")
+		var newLines []string
+		
+		envPattern := fmt.Sprintf("export %s=", envKey)
+		for _, line := range lines {
+			trimmedLine := strings.TrimSpace(line)
+			// 只删除以环境变量开头的行，避免误删
+			if !strings.HasPrefix(trimmedLine, envPattern) {
+				newLines = append(newLines, line)
+			}
+		}
+		
+		// 写回文件
+		if err := os.WriteFile(shellFile, []byte(strings.Join(newLines, "\n")), 0o644); err != nil {
+			// 如果写入失败，跳过这个文件
+			continue
+		}
+	}
+}
+
+// showRefreshInstructions 显示环境变量刷新指导.
+func (em *EnvManager) showRefreshInstructions() error {
+	platform := GetCurrentPlatform()
+	if platform == PlatformWindows {
+		fmt.Println("\n📝 环境变量已设置")
+		fmt.Println("🔄 请重新启动终端或注销重新登录以应用更改")
+		return nil
+	}
+	
+	// macOS 和 Linux
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("获取用户主目录失败: %v", err)
+	}
+	
+	var shellFiles []string
+	if platform == PlatformMac {
+		shellFiles = []string{".zshrc"}
+	} else {
+		shellFiles = []string{".bashrc", ".profile"}
+	}
+	
+	// 显示刷新提示信息
+	fmt.Println("\n📝 环境变量已写入配置文件")
+	fmt.Println("\n💡 要使环境变量在当前终端生效，请执行以下命令之一:")
+	
+	for _, shellFileName := range shellFiles {
+		shellFile := filepath.Join(homeDir, shellFileName)
+		if _, err := os.Stat(shellFile); err == nil {
+			fmt.Printf("   source %s\n", shellFile)
+			break // 只显示第一个存在的文件
+		}
+	}
+	
+	fmt.Println("\n🔄 或者重新启动终端/打开新的终端窗口")
+	fmt.Println("\n⚡ 提示: 新打开的终端窗口会自动应用环境变量更改")
+	
+	return nil
+}
+
+// refreshUnixEnvironment 刷新Unix系统环境变量 (废弃，用showRefreshInstructions替代).
+func (em *EnvManager) refreshUnixEnvironment(shellFiles []string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("获取用户主目录失败: %v", err)
+	}
+
+	// 显示刷新提示信息
+	fmt.Println("\n📝 环境变量已写入配置文件")
+	fmt.Println("\n💡 要使环境变量在当前终端生效，请执行以下命令之一:")
+	
+	for _, shellFileName := range shellFiles {
+		shellFile := filepath.Join(homeDir, shellFileName)
+		if _, err := os.Stat(shellFile); err == nil {
+			fmt.Printf("   source %s\n", shellFile)
+			break // 只显示第一个存在的文件
+		}
+	}
+	
+	fmt.Println("\n🔄 或者重新启动终端/打开新的终端窗口")
+	fmt.Println("\n⚡ 提示: 新打开的终端窗口会自动应用环境变量更改")
+	
+	return nil
 }
