@@ -239,18 +239,29 @@ func (em *EnvManager) unsetEnvironmentVariable(envKey string) {
 
 	// 从配置文件中移除环境变量定义
 	platform := GetCurrentPlatform()
-	var shellFiles []string
 
 	switch platform {
 	case PlatformWindows:
-		// Windows 在这里不删除环境变量，需要用户手动从系统设置中移除
+		// Windows 上使用 setx 清除环境变量
+		cmd := exec.Command("setx", envKey, "")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("警告: 清除环境变量 %s 失败: %v, 输出: %s\n", envKey, err, string(output))
+		} else {
+			fmt.Printf("✓ 环境变量 %s 已清除\n", envKey)
+		}
 		return
 	case PlatformMac:
-		shellFiles = []string{".zshrc"}
+		shellFiles := []string{".zshrc"}
+		em.unsetUnixEnvVar(envKey, shellFiles)
 	case PlatformLinux:
-		shellFiles = []string{".bashrc", ".profile"}
+		shellFiles := []string{".bashrc", ".profile"}
+		em.unsetUnixEnvVar(envKey, shellFiles)
 	}
+}
 
+// unsetUnixEnvVar 在Unix系统中从shell配置文件中移除环境变量
+func (em *EnvManager) unsetUnixEnvVar(envKey string, shellFiles []string) {
 	// 从所有 shell 配置文件中移除环境变量
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -258,6 +269,7 @@ func (em *EnvManager) unsetEnvironmentVariable(envKey string) {
 		return
 	}
 
+	updated := false
 	for _, shellFileName := range shellFiles {
 		shellFile := filepath.Join(homeDir, shellFileName)
 		if _, err := os.Stat(shellFile); os.IsNotExist(err) {
@@ -289,6 +301,11 @@ func (em *EnvManager) unsetEnvironmentVariable(envKey string) {
 			// 如果写入失败，跳过这个文件
 			continue
 		}
+		updated = true
+	}
+
+	if updated {
+		fmt.Printf("✓ 环境变量 %s 已从 shell 配置文件中清除\n", envKey)
 	}
 }
 

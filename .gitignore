@@ -70,3 +70,7 @@ codex-mirror
 *.toml.backup
 .trae/
 .claude/
+
+# 内部文档和工作文件
+CODEBUDDY.md
+SYNC_FEATURE_HANDOVER.md

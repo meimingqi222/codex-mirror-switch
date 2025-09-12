@@ -69,6 +69,16 @@ func (mm *MirrorManager) saveConfig() error {
 	return toml.NewEncoder(file).Encode(mm.config)
 }
 
+// SaveConfig 保存配置文件（公开方法）.
+func (mm *MirrorManager) SaveConfig() error {
+	return mm.saveConfig()
+}
+
+// GetConfig 获取系统配置（公开方法）.
+func (mm *MirrorManager) GetConfig() *SystemConfig {
+	return mm.config
+}
+
 // initDefaultConfig 初始化默认配置.
 func (mm *MirrorManager) initDefaultConfig() {
 	mm.config = &SystemConfig{
