@@ -118,7 +118,57 @@ codex-mirror switch codex-official --vscode-only
 
 # 切换时不备份原配置
 codex-mirror switch claude-official --no-backup
+
+# 即时刷新当前终端环境变量
+
+# bash/zsh（推荐）：
+eval "$(codex-mirror switch claude-official --shell bash)"
+
+# fish：
+codex-mirror switch claude-official --shell fish | source
+
+# PowerShell：
+codex-mirror switch claude-official --shell powershell | iex
 ```
+
+#### 6. 安装/使用 shell 集成（推荐）
+
+安装后，`codex-mirror switch <name>` 将自动：
+- 正常更新配置/持久化（输出到 stderr），以及
+- 自动评估导出语句，让当前会话立即生效。
+
+安装命令：
+
+```bash
+# 自动检测当前 shell 并安装包装函数（Windows 上：PowerShell；若在 Git Bash/MSYS 中运行，会自动识别 bash）
+codex-mirror init
+
+# 或显式指定要安装的 shell：
+codex-mirror init --shell bash
+codex-mirror init --shell zsh
+codex-mirror init --shell fish
+codex-mirror init --shell powershell
+```
+
+加载生效：
+- bash/zsh：`source ~/.bashrc` 或 `source ~/.zshrc`，或重新打开终端
+- fish：自动加载 `~/.config/fish/functions/codex-mirror.fish`
+- PowerShell：重启 PowerShell；或执行 `. "$PROFILE"`
+
+卸载：删除配置文件中标记块（或删除 fish 函数文件）：
+```
+# >>> codex-mirror init >>>
+...
+# <<< codex-mirror init <<<
+```
+
+Windows 说明：
+- PowerShell 集成优先写入：
+  - `%USERPROFILE%\Documents\PowerShell\Microsoft.PowerShell_profile.ps1`（PowerShell 7+）
+  - 若目录不存在，尝试 `%USERPROFILE%\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1`（Windows PowerShell 5.1）
+  - 若存在 OneDrive 重定向，会尝试 `%OneDrive%\Documents\...` 路径
+- CMD 不支持透明集成，推荐使用 PowerShell。
+ - 若在 Windows 的 Git Bash/MSYS 环境运行 `codex-mirror init`，将自动写入 `~/.bashrc`（或现存的 `~/.bash_profile`）。
 
 #### 4. 查看当前状态
 
@@ -242,6 +292,7 @@ tool_type = "codex"
 - `--codex-only`: 只更新 Codex CLI 配置 (仅对 codex 类型有效)
 - `--vscode-only`: 只更新 VS Code 配置 (仅对 codex 类型有效)
 - `--no-backup`: 切换时不备份原配置
+- `--shell`: 输出适配当前 shell 的导出语句 (bash|zsh|fish|powershell|cmd)，可配合 `eval`/`source`/`iex` 实现当前会话即时生效
 
 ## 项目结构
 
@@ -364,3 +415,8 @@ A: 使用 `codex-mirror list` 查看所有镜像源，输出会显示每个镜�
 ---
 
 如有问题或建议，请提交 [Issue](https://github.com/your-username/codex-mirror-switch/issues)。
+# 安装/卸载 shell 集成（让 switch 立即生效）
+codex-mirror init                 # 自动检测当前 shell
+codex-mirror init --shell zsh     # 手动指定 shell
+codex-mirror uninit               # 卸载（自动检测）
+codex-mirror uninit --shell zsh   # 指定 shell 卸载
