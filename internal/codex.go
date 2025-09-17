@@ -298,6 +298,10 @@ func writeTOMLValue(file *os.File, key string, value interface{}, indent string)
 
 // UpdateAuth 更新Codex认证文件.
 func (ccm *CodexConfigManager) UpdateAuth(mirror *MirrorConfig) error {
+	auth := CodexAuth{
+		APIKey: mirror.APIKey,
+	}
+
 	// 创建或更新auth.json文件
 	file, err := os.Create(ccm.authPath)
 	if err != nil {
@@ -309,12 +313,9 @@ func (ccm *CodexConfigManager) UpdateAuth(mirror *MirrorConfig) error {
 		}
 	}()
 
-	// 直接写入 JSON 内容，设置 OPENAI_API_KEY 为 null
-	authContent := `{
-  "OPENAI_API_KEY": null
-}`
-
-	if _, err := file.WriteString(authContent); err != nil {
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(auth); err != nil {
 		return fmt.Errorf("写入认证文件失败: %v", err)
 	}
 
