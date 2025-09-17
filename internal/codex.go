@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -79,23 +80,28 @@ func (ccm *CodexConfigManager) FixEnvKeyFormat() error {
 }
 
 func (ccm *CodexConfigManager) UpdateConfig(mirror *MirrorConfig) error {
-	// 尝试读取现有配置
+	config, rawConfig, err := ccm.loadExistingConfig()
+	if err != nil {
+		return err
+	}
+
+	providerConfig := ccm.createProviderConfig(mirror, config)
+	ccm.updateConfigStructures(config, rawConfig, mirror.Name, providerConfig)
+
+	return ccm.writeConfigFile(rawConfig)
+}
+
+func (ccm *CodexConfigManager) loadExistingConfig() (*CodexConfig, map[string]interface{}, error) {
 	var config CodexConfig
 	var rawConfig map[string]interface{}
 
-	// 如果配置文件存在，先读取现有配置
 	if _, err := os.Stat(ccm.configPath); err == nil {
-		// 读取原始配置到map中以保留未知字段
-		if _, err := toml.DecodeFile(ccm.configPath, &rawConfig); err != nil {
-			return fmt.Errorf("读取现有配置文件失败: %v", err)
-		}
-
-		// 读取到结构体中
-		if _, err := toml.DecodeFile(ccm.configPath, &config); err != nil {
-			return fmt.Errorf("解析现有配置文件失败: %v", err)
+		var err error
+		rawConfig, err = ccm.decodeConfigFiles(&config)
+		if err != nil {
+			return nil, nil, err
 		}
 	} else {
-		// 如果配置文件不存在，创建默认配置
 		config = CodexConfig{
 			ModelProvider:          "packycode",
 			Model:                  "gpt-5",
@@ -106,48 +112,110 @@ func (ccm *CodexConfigManager) UpdateConfig(mirror *MirrorConfig) error {
 		rawConfig = make(map[string]interface{})
 	}
 
-	// 确保ModelProviders存在
+	return &config, rawConfig, nil
+}
+
+func (ccm *CodexConfigManager) decodeConfigFiles(config *CodexConfig) (map[string]interface{}, error) {
+	var rawConfig map[string]interface{}
+
+	if _, err := toml.DecodeFile(ccm.configPath, &rawConfig); err != nil {
+		return nil, fmt.Errorf("读取现有配置文件失败: %v", err)
+	}
+
+	if _, err := toml.DecodeFile(ccm.configPath, config); err != nil {
+		return nil, fmt.Errorf("解析现有配置文件失败: %v", err)
+	}
+
+	return rawConfig, nil
+}
+
+func (ccm *CodexConfigManager) createProviderConfig(mirror *MirrorConfig, config *CodexConfig) ModelProviderConfig {
 	if config.ModelProviders == nil {
 		config.ModelProviders = make(map[string]ModelProviderConfig)
 	}
 
-	// 更新或添加镜像源配置
 	providerConfig := ModelProviderConfig{
-		Name:    mirror.Name,
-		BaseURL: mirror.BaseURL,
-		WireAPI: "responses",
-		EnvKey:  mirror.EnvKey, // 直接使用镜像源中已设置的env_key
+		Name:               mirror.Name,
+		BaseURL:            mirror.BaseURL,
+		WireAPI:            "responses",
+		EnvKey:             mirror.EnvKey,
+		RequiresOpenAIAuth: true,
 	}
 
-	// 如果已存在配置，保留现有的wire_api和正确格式的env_key
 	if existingProvider, exists := config.ModelProviders[mirror.Name]; exists {
-		if existingProvider.WireAPI != "" {
-			providerConfig.WireAPI = existingProvider.WireAPI
-		}
-		// 如果现有的env_key已经是正确的CODEX_前缀格式，保留它
-		expectedEnvKey := CodexSwitchAPIKeyEnv // Codex 固定使用专用的环境变量名
-		if existingProvider.EnvKey == expectedEnvKey {
-			providerConfig.EnvKey = existingProvider.EnvKey
-		}
+		ccm.mergeExistingProviderConfig(&providerConfig, existingProvider)
 	}
 
-	config.ModelProviders[mirror.Name] = providerConfig
+	return providerConfig
+}
 
-	// 设置model_provider为当前切换的镜像源名称
-	config.ModelProvider = mirror.Name
+func (ccm *CodexConfigManager) mergeExistingProviderConfig(providerConfig *ModelProviderConfig, existingProvider ModelProviderConfig) {
+	if existingProvider.WireAPI != "" {
+		providerConfig.WireAPI = existingProvider.WireAPI
+	}
 
-	// 如果没有设置默认值，设置默认值
+	if existingProvider.EnvKey == CodexSwitchAPIKeyEnv {
+		providerConfig.EnvKey = existingProvider.EnvKey
+	}
+
+	providerConfig.RequiresOpenAIAuth = existingProvider.RequiresOpenAIAuth
+}
+
+func (ccm *CodexConfigManager) updateConfigStructures(config *CodexConfig, rawConfig map[string]interface{}, mirrorName string, providerConfig ModelProviderConfig) {
+	config.ModelProviders[mirrorName] = providerConfig
+
+	if rawConfig == nil {
+		rawConfig = make(map[string]interface{})
+	}
+
+	ccm.updateRawConfigBasicFields(rawConfig, config, mirrorName)
+	ccm.updateRawConfigModelProviders(rawConfig, mirrorName, providerConfig)
+}
+
+func (ccm *CodexConfigManager) updateRawConfigBasicFields(rawConfig map[string]interface{}, config *CodexConfig, mirrorName string) {
+	rawConfig["model_provider"] = mirrorName
+	rawConfig["model"] = config.Model
 	if config.Model == "" {
-		config.Model = "gpt-5"
+		rawConfig["model"] = "gpt-5"
 	}
+	rawConfig["model_reasoning_effort"] = config.ModelReasoningEffort
 	if config.ModelReasoningEffort == "" {
-		config.ModelReasoningEffort = "high"
+		rawConfig["model_reasoning_effort"] = "high"
+	}
+	rawConfig["disable_response_storage"] = true
+}
+
+func (ccm *CodexConfigManager) updateRawConfigModelProviders(rawConfig map[string]interface{}, mirrorName string, providerConfig ModelProviderConfig) {
+	// 直接使用扁平化结构 [model_providers.mirrorname]
+	// 移除嵌套的 model_providers 节
+
+	// 移除旧的嵌套 model_providers 节（如果存在）
+	delete(rawConfig, "model_providers")
+
+	// 移除旧的扁平化键（如果存在）
+	var keysToDelete []string
+	for key := range rawConfig {
+		if len(key) > len("model_providers.") && key[:len("model_providers.")] == "model_providers." {
+			keysToDelete = append(keysToDelete, key)
+		}
+	}
+	for _, key := range keysToDelete {
+		delete(rawConfig, key)
 	}
 
-	// 强制写入禁用响应存储的配置
-	config.DisableResponseStorage = true
+	// 直接设置当前 provider 配置
+	// 生成 [model_providers.mirrorname] 的扁平化结构
+	sectionName := "model_providers." + mirrorName
+	rawConfig[sectionName] = map[string]interface{}{
+		"name":                 providerConfig.Name,
+		"base_url":             providerConfig.BaseURL,
+		"wire_api":             providerConfig.WireAPI,
+		"env_key":              providerConfig.EnvKey,
+		"requires_openai_auth": providerConfig.RequiresOpenAIAuth,
+	}
+}
 
-	// 创建或更新config.toml文件
+func (ccm *CodexConfigManager) writeConfigFile(rawConfig map[string]interface{}) error {
 	file, err := os.Create(ccm.configPath)
 	if err != nil {
 		return fmt.Errorf("创建配置文件失败: %v", err)
@@ -158,40 +226,78 @@ func (ccm *CodexConfigManager) UpdateConfig(mirror *MirrorConfig) error {
 		}
 	}()
 
-	// 手动构建TOML内容以避免嵌套的[model_providers]结构
-	content := fmt.Sprintf(`model_provider = "%s"
-model = "%s"
-model_reasoning_effort = "%s"
-disable_response_storage = %t
-
-`,
-		config.ModelProvider, config.Model, config.ModelReasoningEffort, config.DisableResponseStorage)
-
-	// 添加每个模型提供商的配置
-	for name, provider := range config.ModelProviders {
-		content += fmt.Sprintf(`[model_providers.%s]
-name = "%s"
-base_url = "%s"
-wire_api = "%s"
-env_key = "%s"
-
-`,
-			name, provider.Name, provider.BaseURL, provider.WireAPI, provider.EnvKey)
+	// 首先写入基本配置项（不包含点的键值对）
+	basicKeys := []string{"model_provider", "model", "model_reasoning_effort", "disable_response_storage"}
+	for _, key := range basicKeys {
+		if value, exists := rawConfig[key]; exists && !isMap(value) {
+			if err := writeTOMLValue(file, key, value, ""); err != nil {
+				return err
+			}
+		}
 	}
 
-	if _, err := file.WriteString(content); err != nil {
-		return fmt.Errorf("写入配置文件失败: %v", err)
+	// 然后写入带点的节（如 [model_providers.packycode]）
+	for key, value := range rawConfig {
+		if strings.Contains(key, ".") {
+			if subMap, ok := value.(map[string]interface{}); ok {
+				if _, err := fmt.Fprintf(file, "\n[%s]\n", key); err != nil {
+					return err
+				}
+				if err := writeTOMLMap(file, subMap, "  "); err != nil {
+					return err
+				}
+			}
+		}
 	}
 
 	return nil
 }
 
+func isMap(value interface{}) bool {
+	_, ok := value.(map[string]interface{})
+	return ok
+}
+
+func writeTOMLMap(file *os.File, m map[string]interface{}, indent string) error {
+	for key, value := range m {
+		if err := writeTOMLValue(file, key, value, indent); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeTOMLValue(file *os.File, key string, value interface{}, indent string) error {
+	switch v := value.(type) {
+	case string:
+		_, err := fmt.Fprintf(file, "%s%s = %q\n", indent, key, v)
+		return err
+	case bool:
+		_, err := fmt.Fprintf(file, "%s%s = %t\n", indent, key, v)
+		return err
+	case int:
+		_, err := fmt.Fprintf(file, "%s%s = %d\n", indent, key, v)
+		return err
+	case int32:
+		_, err := fmt.Fprintf(file, "%s%s = %d\n", indent, key, v)
+		return err
+	case int64:
+		_, err := fmt.Fprintf(file, "%s%s = %d\n", indent, key, v)
+		return err
+	case float32:
+		_, err := fmt.Fprintf(file, "%s%s = %f\n", indent, key, v)
+		return err
+	case float64:
+		_, err := fmt.Fprintf(file, "%s%s = %f\n", indent, key, v)
+		return err
+	default:
+		_, err := fmt.Fprintf(file, "%s%s = %v\n", indent, key, v)
+		return err
+	}
+}
+
 // UpdateAuth 更新Codex认证文件.
 func (ccm *CodexConfigManager) UpdateAuth(mirror *MirrorConfig) error {
-	auth := CodexAuth{
-		APIKey: mirror.APIKey,
-	}
-
 	// 创建或更新auth.json文件
 	file, err := os.Create(ccm.authPath)
 	if err != nil {
@@ -203,9 +309,12 @@ func (ccm *CodexConfigManager) UpdateAuth(mirror *MirrorConfig) error {
 		}
 	}()
 
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(auth); err != nil {
+	// 直接写入 JSON 内容，设置 OPENAI_API_KEY 为 null
+	authContent := `{
+  "OPENAI_API_KEY": null
+}`
+
+	if _, err := file.WriteString(authContent); err != nil {
 		return fmt.Errorf("写入认证文件失败: %v", err)
 	}
 

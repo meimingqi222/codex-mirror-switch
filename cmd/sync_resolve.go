@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"codex-mirror/internal"
+
 	"github.com/spf13/cobra"
 )
 
@@ -16,10 +17,10 @@ var syncResolveCmd = &cobra.Command{
 	RunE:  runSyncResolve,
 }
 
-// 冲突解决参数
+// 冲突解决参数.
 var (
-	resolvePreview  bool
-	resolveForce    bool
+	resolvePreview bool
+	resolveForce   bool
 )
 
 func init() {
@@ -51,13 +52,12 @@ func runSyncResolve(cmd *cobra.Command, args []string) error {
 	fmt.Printf("🔍 正在检测配置冲突...\n")
 
 	// 获取云端数据
-	syncData, err := fetchRemoteData(syncManager)
-	if err != nil {
+	if err := fetchRemoteData(syncManager); err != nil {
 		return fmt.Errorf("获取云端数据失败: %w", err)
 	}
 
-	// 检测冲突
-	resolver := internal.NewConflictResolver(mirrorManager.GetConfig(), syncData)
+	// 检测冲突 - 使用空数据，因为 fetchRemoteData 未实现
+	resolver := internal.NewConflictResolver(mirrorManager.GetConfig(), nil)
 	conflicts := resolver.DetectConflicts()
 
 	if len(conflicts.Conflicts) == 0 {
@@ -93,7 +93,7 @@ func runSyncResolve(cmd *cobra.Command, args []string) error {
 	if !resolveForce {
 		fmt.Printf("\n是否继续解决冲突？(y/N): ")
 		var confirm string
-		fmt.Scanln(&confirm)
+		_, _ = fmt.Scanln(&confirm)
 		if confirm != "y" && confirm != "Y" {
 			fmt.Printf("已取消冲突解决\n")
 			return nil
@@ -138,14 +138,14 @@ func runSyncResolve(cmd *cobra.Command, args []string) error {
 }
 
 // fetchRemoteData 获取云端数据.
-func fetchRemoteData(syncManager *internal.SyncManager) (*internal.SyncData, error) {
+func fetchRemoteData(syncManager *internal.SyncManager) error {
 	if err := syncManager.LoadSync(); err != nil {
-		return nil, err
+		return err
 	}
 
 	// 这里复用 Pull 的逻辑来获取云端数据，但不应用
 	// 为了简化，我们直接调用底层方法
-	return nil, fmt.Errorf("需要实现 fetchRemoteData 方法")
+	return fmt.Errorf("需要实现 fetchRemoteData 方法")
 }
 
 // createConfigBackup 创建配置备份.
@@ -186,17 +186,17 @@ func showPostResolveNotices(conflicts *internal.ConflictResolution, strategy str
 
 	if hasNewMirrors || hasModifiedMirrors {
 		fmt.Printf("\n💡 重要提醒:\n")
-		
+
 		if hasNewMirrors {
 			fmt.Printf("   - 新增的镜像源需要手动配置API密钥\n")
 			fmt.Printf("   - 使用 'codex-mirror list' 查看所有镜像源\n")
 		}
-		
+
 		if hasModifiedMirrors && strategy != "local" {
 			fmt.Printf("   - 部分镜像源配置已更新\n")
 			fmt.Printf("   - 请检查API密钥是否仍然有效\n")
 		}
-		
+
 		fmt.Printf("   - 使用 'codex-mirror status' 检查当前状态\n")
 		fmt.Printf("   - 建议测试各镜像源的连接性\n")
 	}

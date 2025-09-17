@@ -62,14 +62,7 @@ coverage: test
 # 代码质量检查（使用golangci-lint）
 .PHONY: lint
 lint:
-	@echo "正在进行代码质量检查..."
-	@echo "运行 golangci-lint..."
-	@if ! command -v golangci-lint >/dev/null 2>&1; then \
-		echo "安装 golangci-lint..."; \
-		$(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; \
-	fi
-	@golangci-lint run ./...
-	@echo "✅ golangci-lint 检查通过"
+	@./scripts/lint.sh
 
 # 运行轻量级 lint 工具（可选）
 .PHONY: lint-light
@@ -94,7 +87,7 @@ lint-light:
 .PHONY: lint-check
 lint-check:
 	@echo "正在运行完整的代码质量检查..."
-	@./scripts/lint-check.sh
+	@./scripts/lint-full.sh
 
 # 运行基础检查（CI友好）
 .PHONY: lint-ci
@@ -116,6 +109,13 @@ lint-ci:
 .PHONY: build
 build: lint deps
 	@echo "正在构建 $(APP_NAME)..."
+	@mkdir -p $(BUILD_DIR)
+	$(GOBUILD) $(GOFLAGS) -o $(BUILD_DIR)/$(APP_NAME) ./main.go
+
+# 快速构建（跳过lint检查，用于测试）
+.PHONY: build-fast
+build-fast: deps
+	@echo "正在快速构建 $(APP_NAME)..."
 	@mkdir -p $(BUILD_DIR)
 	$(GOBUILD) $(GOFLAGS) -o $(BUILD_DIR)/$(APP_NAME) ./main.go
 

@@ -42,10 +42,11 @@ type CodexConfig struct {
 
 // ModelProviderConfig 模型提供商配置.
 type ModelProviderConfig struct {
-	Name    string `toml:"name"`
-	BaseURL string `toml:"base_url"`
-	WireAPI string `toml:"wire_api,omitempty"`
-	EnvKey  string `toml:"env_key,omitempty"`
+	Name               string `toml:"name"`
+	BaseURL            string `toml:"base_url"`
+	WireAPI            string `toml:"wire_api,omitempty"`
+	EnvKey             string `toml:"env_key,omitempty"`
+	RequiresOpenAIAuth bool   `toml:"requires_openai_auth,omitempty"`
 }
 
 // CodexAuth Codex CLI认证文件结构.
@@ -84,6 +85,15 @@ const (
 
 	// 默认镜像源名称.
 	DefaultMirrorName = "official"
+
+	// Shell 类型常量.
+	BashShell       = "bash"
+	ZshShell        = "zsh"
+	FishShell       = "fish"
+	PowerShellShell = "powershell"
+	PwshShell       = "pwsh"
+	CmdShell        = "cmd"
+	BatShell        = "bat"
 )
 
 // PathConfig 路径配置结构.
@@ -95,39 +105,39 @@ type PathConfig struct {
 
 // SyncConfig 云同步配置结构.
 type SyncConfig struct {
-	Enabled       bool      `json:"enabled" toml:"enabled"`                         // 是否启用同步
-	Provider      string    `json:"provider" toml:"provider"`                       // 同步提供商 (gist, webdav, custom)
-	Endpoint      string    `json:"endpoint" toml:"endpoint"`                       // API端点
-	Token         string    `json:"token" toml:"token"`                             // 访问令牌
-	EncryptKey    string    `json:"encrypt_key" toml:"encrypt_key"`                 // 加密密钥
-	AutoSync      bool      `json:"auto_sync" toml:"auto_sync"`                     // 自动同步
-	SyncInterval  int       `json:"sync_interval" toml:"sync_interval"`             // 同步间隔(分钟)
-	LastSync      time.Time `json:"last_sync" toml:"last_sync"`                     // 最后同步时间
-	DeviceID      string    `json:"device_id" toml:"device_id"`                     // 设备ID
-	GistID        string    `json:"gist_id,omitempty" toml:"gist_id,omitempty"`     // GitHub Gist ID
-	SyncAPIKeys   bool      `json:"sync_api_keys" toml:"sync_api_keys"`             // 是否同步API密钥
+	Enabled       bool      `json:"enabled" toml:"enabled"`                                   // 是否启用同步
+	Provider      string    `json:"provider" toml:"provider"`                                 // 同步提供商 (gist, webdav, custom)
+	Endpoint      string    `json:"endpoint" toml:"endpoint"`                                 // API端点
+	Token         string    `json:"token" toml:"token"`                                       // 访问令牌
+	EncryptKey    string    `json:"encrypt_key" toml:"encrypt_key"`                           // 加密密钥
+	AutoSync      bool      `json:"auto_sync" toml:"auto_sync"`                               // 自动同步
+	SyncInterval  int       `json:"sync_interval" toml:"sync_interval"`                       // 同步间隔(分钟)
+	LastSync      time.Time `json:"last_sync" toml:"last_sync"`                               // 最后同步时间
+	DeviceID      string    `json:"device_id" toml:"device_id"`                               // 设备ID
+	GistID        string    `json:"gist_id,omitempty" toml:"gist_id,omitempty"`               // GitHub Gist ID
+	SyncAPIKeys   bool      `json:"sync_api_keys" toml:"sync_api_keys"`                       // 是否同步API密钥
 	EncryptionPwd string    `json:"encryption_pwd,omitempty" toml:"encryption_pwd,omitempty"` // 加密密码（可选，用于额外安全层）
 }
 
 // SyncData 同步数据结构.
 type SyncData struct {
-	Mirrors       []MirrorConfig `json:"mirrors"`                                 // 镜像源配置（可能包含加密的API密钥）
-	CurrentCodex  string         `json:"current_codex"`                           // 当前 Codex 镜像源
-	CurrentClaude string         `json:"current_claude"`                          // 当前 Claude 镜像源
-	Timestamp     time.Time      `json:"timestamp"`                               // 时间戳
-	DeviceID      string         `json:"device_id"`                               // 设备ID
-	Version       string         `json:"version"`                                 // 配置版本
-	Checksum      string         `json:"checksum,omitempty"`                      // 数据校验和
-	HasAPIKeys    bool           `json:"has_api_keys"`                            // 是否包含API密钥
+	Mirrors       []MirrorConfig `json:"mirrors"`            // 镜像源配置（可能包含加密的API密钥）
+	CurrentCodex  string         `json:"current_codex"`      // 当前 Codex 镜像源
+	CurrentClaude string         `json:"current_claude"`     // 当前 Claude 镜像源
+	Timestamp     time.Time      `json:"timestamp"`          // 时间戳
+	DeviceID      string         `json:"device_id"`          // 设备ID
+	Version       string         `json:"version"`            // 配置版本
+	Checksum      string         `json:"checksum,omitempty"` // 数据校验和
+	HasAPIKeys    bool           `json:"has_api_keys"`       // 是否包含API密钥
 }
 
 // SecureMirrorConfig 安全的镜像源配置（不包含API密钥）.
 type SecureMirrorConfig struct {
-	Name      string   `json:"name"`                                 // 镜像源名称
-	BaseURL   string   `json:"base_url"`                             // API基础URL
-	HasAPIKey bool     `json:"has_api_key"`                          // 是否有API密钥
-	ToolType  ToolType `json:"tool_type"`                            // 工具类型
-	ModelName string   `json:"model_name,omitempty"`                 // 模型名称
+	Name      string   `json:"name"`                 // 镜像源名称
+	BaseURL   string   `json:"base_url"`             // API基础URL
+	HasAPIKey bool     `json:"has_api_key"`          // 是否有API密钥
+	ToolType  ToolType `json:"tool_type"`            // 工具类型
+	ModelName string   `json:"model_name,omitempty"` // 模型名称
 }
 
 // SyncProvider 同步提供商接口.
@@ -146,9 +156,9 @@ type SyncProvider interface {
 
 // ProviderInfo 提供商信息.
 type ProviderInfo struct {
-	Name        string `json:"name"`         // 提供商名称
-	Type        string `json:"type"`         // 提供商类型
-	Endpoint    string `json:"endpoint"`     // API端点
+	Name        string `json:"name"`          // 提供商名称
+	Type        string `json:"type"`          // 提供商类型
+	Endpoint    string `json:"endpoint"`      // API端点
 	MaxFileSize int64  `json:"max_file_size"` // 最大文件大小
-	Description string `json:"description"`  // 描述
+	Description string `json:"description"`   // 描述
 }

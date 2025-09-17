@@ -94,7 +94,11 @@ func (g *GistProvider) Upload(data []byte, filename string) error {
 	if err != nil {
 		return fmt.Errorf("发送请求失败: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("Warning: failed to close response body: %v\n", err)
+		}
+	}()
 
 	// 读取响应
 	respBody, err := io.ReadAll(resp.Body)
@@ -126,83 +130,100 @@ func (g *GistProvider) Download(filename string) ([]byte, error) {
 		return nil, fmt.Errorf("Gist ID 未设置")
 	}
 
-	// 构建请求 URL
+	respBody, err := g.fetchGistData()
+	if err != nil {
+		return nil, err
+	}
+
+	fileContent, err := g.extractFileContent(respBody, filename)
+	if err != nil {
+		return nil, err
+	}
+
+	return base64.StdEncoding.DecodeString(fileContent)
+}
+
+func (g *GistProvider) fetchGistData() ([]byte, error) {
 	url := fmt.Sprintf("https://api.github.com/gists/%s", g.gistID)
 
-	// 创建 HTTP 请求
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("创建请求失败: %w", err)
 	}
 
-	// 设置请求头
 	req.Header.Set("Authorization", "token "+g.token)
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
-	// 发送请求
 	resp, err := g.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("发送请求失败: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("Warning: failed to close response body: %v\n", err)
+		}
+	}()
 
-	// 读取响应
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %w", err)
 	}
 
-	// 检查响应状态
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("GitHub API 错误 (%d): %s", resp.StatusCode, string(respBody))
 	}
 
-	// 解析响应
+	return respBody, nil
+}
+
+func (g *GistProvider) extractFileContent(respBody []byte, filename string) (string, error) {
 	var gistResp map[string]interface{}
 	if err := json.Unmarshal(respBody, &gistResp); err != nil {
-		return nil, fmt.Errorf("解析响应失败: %w", err)
+		return "", fmt.Errorf("解析响应失败: %w", err)
 	}
 
-	// 获取文件内容
 	files, ok := gistResp["files"].(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("响应中没有找到文件信息")
+		return "", fmt.Errorf("响应中没有找到文件信息")
 	}
 
-	// 查找指定文件
-	var fileContent string
 	if filename != "" {
-		// 查找指定文件名
-		if file, exists := files[filename]; exists {
-			if fileData, ok := file.(map[string]interface{}); ok {
-				if content, ok := fileData["content"].(string); ok {
-					fileContent = content
-				}
-			}
+		return g.getSpecificFile(files, filename)
+	}
+	return g.getFirstFile(files)
+}
+
+func (g *GistProvider) getSpecificFile(files map[string]interface{}, filename string) (string, error) {
+	file, exists := files[filename]
+	if !exists {
+		return "", fmt.Errorf("未找到文件: %s", filename)
+	}
+
+	return extractContentFromFile(file)
+}
+
+func (g *GistProvider) getFirstFile(files map[string]interface{}) (string, error) {
+	for _, file := range files {
+		content, err := extractContentFromFile(file)
+		if err == nil && content != "" {
+			return content, nil
 		}
-	} else {
-		// 如果没有指定文件名，取第一个文件
-		for _, file := range files {
-			if fileData, ok := file.(map[string]interface{}); ok {
-				if content, ok := fileData["content"].(string); ok {
-					fileContent = content
-					break
-				}
-			}
-		}
+	}
+	return "", fmt.Errorf("未找到文件内容")
+}
+
+func extractContentFromFile(file interface{}) (string, error) {
+	fileData, ok := file.(map[string]interface{})
+	if !ok {
+		return "", fmt.Errorf("文件数据格式错误")
 	}
 
-	if fileContent == "" {
-		return nil, fmt.Errorf("未找到文件内容")
+	content, ok := fileData["content"].(string)
+	if !ok {
+		return "", fmt.Errorf("未找到文件内容")
 	}
 
-	// 解码 base64 数据
-	data, err := base64.StdEncoding.DecodeString(fileContent)
-	if err != nil {
-		return nil, fmt.Errorf("解码文件内容失败: %w", err)
-	}
-
-	return data, nil
+	return content, nil
 }
 
 // List 列出 Gist 中的所有文件.
@@ -215,7 +236,7 @@ func (g *GistProvider) List() ([]string, error) {
 	url := fmt.Sprintf("https://api.github.com/gists/%s", g.gistID)
 
 	// 创建 HTTP 请求
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("创建请求失败: %w", err)
 	}
@@ -229,7 +250,11 @@ func (g *GistProvider) List() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("发送请求失败: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("Warning: failed to close response body: %v\n", err)
+		}
+	}()
 
 	// 读取响应
 	respBody, err := io.ReadAll(resp.Body)
@@ -257,8 +282,8 @@ func (g *GistProvider) List() ([]string, error) {
 	var fileList []string
 	for filename := range files {
 		// 返回新的统一配置文件或旧的设备特定配置文件
-		if filename == "codex-mirror-config.json" || 
-		   (strings.HasPrefix(filename, "codex-mirror-config-") && strings.HasSuffix(filename, ".json")) {
+		if filename == ConfigFileName ||
+			(strings.HasPrefix(filename, "codex-mirror-config-") && strings.HasSuffix(filename, ".json")) {
 			fileList = append(fileList, filename)
 		}
 	}
@@ -304,7 +329,11 @@ func (g *GistProvider) Delete(filename string) error {
 	if err != nil {
 		return fmt.Errorf("发送请求失败: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("Warning: failed to close response body: %v\n", err)
+		}
+	}()
 
 	// 检查响应状态
 	if resp.StatusCode != http.StatusOK {
@@ -336,7 +365,7 @@ func (g *GistProvider) SetGistID(gistID string) {
 	g.gistID = gistID
 }
 
-// GistCandidate 表示一个候选的配置 Gist
+// GistCandidate 表示一个候选的配置 Gist.
 type GistCandidate struct {
 	ID          string
 	Description string
@@ -350,7 +379,7 @@ func (g *GistProvider) discoverExistingGist() (string, error) {
 	url := "https://api.github.com/gists"
 
 	// 创建 HTTP 请求
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, http.NoBody)
 	if err != nil {
 		return "", fmt.Errorf("创建请求失败: %w", err)
 	}
@@ -364,7 +393,11 @@ func (g *GistProvider) discoverExistingGist() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("发送请求失败: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("Warning: failed to close response body: %v\n", err)
+		}
+	}()
 
 	// 读取响应
 	respBody, err := io.ReadAll(resp.Body)
@@ -384,33 +417,7 @@ func (g *GistProvider) discoverExistingGist() (string, error) {
 	}
 
 	// 收集所有匹配的 Gist 候选项
-	var candidates []GistCandidate
-	for _, gist := range gists {
-		if description, ok := gist["description"].(string); ok {
-			// 检查描述是否包含我们的标识
-			if strings.Contains(description, "codex-mirror-sync") {
-				if id, ok := gist["id"].(string); ok {
-					// 进一步验证 Gist 内容
-					if g.validateGistContent(id) {
-						candidate := GistCandidate{
-							ID:          id,
-							Description: description,
-						}
-						
-						// 获取时间信息
-						if updatedAt, ok := gist["updated_at"].(string); ok {
-							candidate.UpdatedAt = updatedAt
-						}
-						if createdAt, ok := gist["created_at"].(string); ok {
-							candidate.CreatedAt = createdAt
-						}
-
-						candidates = append(candidates, candidate)
-					}
-				}
-			}
-		}
-	}
+	candidates := g.extractCandidatesFromGists(gists)
 
 	// 如果没有找到候选项
 	if len(candidates) == 0 {
@@ -424,7 +431,7 @@ func (g *GistProvider) discoverExistingGist() (string, error) {
 
 	// 多个候选项：选择最新更新的
 	fmt.Printf("🔍 发现 %d 个配置 Gist，选择最新的...\n", len(candidates))
-	
+
 	latestCandidate := candidates[0]
 	latestTime, err := time.Parse(time.RFC3339, candidates[0].UpdatedAt)
 	if err != nil {
@@ -437,14 +444,14 @@ func (g *GistProvider) discoverExistingGist() (string, error) {
 		if err != nil {
 			continue
 		}
-		
+
 		if candidateTime.After(latestTime) {
 			latestCandidate = candidates[i]
 			latestTime = candidateTime
 		}
 	}
 
-	fmt.Printf("   选中最新的 Gist (更新于: %s): %s\n", 
+	fmt.Printf("   选中最新的 Gist (更新于: %s): %s\n",
 		latestTime.Format("2006-01-02 15:04:05"), latestCandidate.ID)
 
 	return latestCandidate.ID, nil
@@ -456,7 +463,7 @@ func (g *GistProvider) validateGistContent(gistID string) bool {
 	url := fmt.Sprintf("https://api.github.com/gists/%s", gistID)
 
 	// 创建 HTTP 请求
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, http.NoBody)
 	if err != nil {
 		return false
 	}
@@ -470,7 +477,11 @@ func (g *GistProvider) validateGistContent(gistID string) bool {
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("Warning: failed to close response body: %v\n", err)
+		}
+	}()
 
 	// 读取响应
 	respBody, err := io.ReadAll(resp.Body)
@@ -496,7 +507,7 @@ func (g *GistProvider) validateGistContent(gistID string) bool {
 	}
 
 	// 查找配置文件 - 检查新的统一命名格式
-	if _, exists := files["codex-mirror-config.json"]; exists {
+	if _, exists := files[ConfigFileName]; exists {
 		return true
 	}
 
@@ -508,4 +519,54 @@ func (g *GistProvider) validateGistContent(gistID string) bool {
 	}
 
 	return false
+}
+
+// extractCandidatesFromGists 从 Gist 列表中提取有效的候选项.
+func (g *GistProvider) extractCandidatesFromGists(gists []map[string]interface{}) []GistCandidate {
+	var candidates []GistCandidate
+	for _, gist := range gists {
+		candidate := g.extractCandidateFromGist(gist)
+		if candidate != nil {
+			candidates = append(candidates, *candidate)
+		}
+	}
+	return candidates
+}
+
+// extractCandidateFromGist 从单个 Gist 中提取候选项信息.
+func (g *GistProvider) extractCandidateFromGist(gist map[string]interface{}) *GistCandidate {
+	description, ok := gist["description"].(string)
+	if !ok {
+		return nil
+	}
+
+	// 检查描述是否包含我们的标识
+	if !strings.Contains(description, "codex-mirror-sync") {
+		return nil
+	}
+
+	id, ok := gist["id"].(string)
+	if !ok {
+		return nil
+	}
+
+	// 进一步验证 Gist 内容
+	if !g.validateGistContent(id) {
+		return nil
+	}
+
+	candidate := GistCandidate{
+		ID:          id,
+		Description: description,
+	}
+
+	// 获取时间信息
+	if updatedAt, ok := gist["updated_at"].(string); ok {
+		candidate.UpdatedAt = updatedAt
+	}
+	if createdAt, ok := gist["created_at"].(string); ok {
+		candidate.CreatedAt = createdAt
+	}
+
+	return &candidate
 }

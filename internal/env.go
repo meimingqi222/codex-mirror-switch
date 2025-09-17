@@ -260,7 +260,7 @@ func (em *EnvManager) unsetEnvironmentVariable(envKey string) {
 	}
 }
 
-// unsetUnixEnvVar 在Unix系统中从shell配置文件中移除环境变量
+// unsetUnixEnvVar 在Unix系统中从shell配置文件中移除环境变量.
 func (em *EnvManager) unsetUnixEnvVar(envKey string, shellFiles []string) {
 	// 从所有 shell 配置文件中移除环境变量
 	homeDir, err := os.UserHomeDir()

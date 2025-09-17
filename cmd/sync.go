@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"codex-mirror/internal"
+
 	"github.com/spf13/cobra"
 )
 
@@ -55,16 +56,16 @@ var syncConfigCmd = &cobra.Command{
 	RunE:  runSyncConfig,
 }
 
-// 命令行参数
+// 命令行参数.
 var (
-	syncToken        string
-	syncAutoSync     bool
-	syncInterval     int
-	syncDisable      bool
-	syncEncryptPwd   string
-	resolveStrategy  string
-	pushStrategy     string
-	syncGistID       string
+	syncToken       string
+	syncAutoSync    bool
+	syncInterval    int
+	syncDisable     bool
+	syncEncryptPwd  string
+	resolveStrategy string
+	pushStrategy    string
+	syncGistID      string
 )
 
 func init() {
@@ -79,8 +80,8 @@ func init() {
 	syncInitCmd.Flags().StringVarP(&syncToken, "token", "t", "", "GitHub访问令牌 (必需)")
 	syncInitCmd.Flags().StringVarP(&syncEncryptPwd, "password", "p", "", "加密密码 (必需)")
 	syncInitCmd.Flags().StringVar(&syncGistID, "gist-id", "", "现有的Gist ID (可选，用于连接到现有配置)")
-	syncInitCmd.MarkFlagRequired("token")
-	syncInitCmd.MarkFlagRequired("password")
+	_ = syncInitCmd.MarkFlagRequired("token")
+	_ = syncInitCmd.MarkFlagRequired("password")
 
 	// syncConfigCmd 参数
 	syncConfigCmd.Flags().BoolVar(&syncAutoSync, "auto-sync", false, "启用自动同步")
@@ -111,7 +112,7 @@ func runSyncInit(cmd *cobra.Command, args []string) error {
 		fmt.Printf("📖 详细帮助: codex-mirror sync help\n")
 		return fmt.Errorf("GitHub访问令牌不能为空")
 	}
-	
+
 	if syncEncryptPwd == "" {
 		fmt.Printf("❌ 加密密码不能为空\n\n")
 		fmt.Printf("💡 密码要求:\n")
@@ -120,7 +121,7 @@ func runSyncInit(cmd *cobra.Command, args []string) error {
 		fmt.Printf("   - 请妥善保管，忘记密码将无法解密云端数据\n")
 		return fmt.Errorf("加密密码不能为空")
 	}
-	
+
 	if len(syncEncryptPwd) < 8 {
 		return fmt.Errorf("加密密码长度至少8位，当前长度: %d", len(syncEncryptPwd))
 	}
@@ -138,7 +139,7 @@ func runSyncInit(cmd *cobra.Command, args []string) error {
 	fmt.Printf("   提供商: GitHub Gist\n")
 	fmt.Printf("   端点: https://api.github.com\n")
 	fmt.Printf("   🔐 全量同步: 启用（包含加密的API密钥）\n")
-	
+
 	fmt.Printf("\n🛡️  安全说明:\n")
 	fmt.Printf("   - 所有数据使用AES-256加密\n")
 	fmt.Printf("   - 使用你提供的密码进行加密\n")
@@ -306,13 +307,13 @@ func runSyncStatus(cmd *cobra.Command, args []string) error {
 	fmt.Printf("   端点: %s\n", status.Endpoint)
 	fmt.Printf("   设备ID: %s\n", status.DeviceID)
 	fmt.Printf("   自动同步: %s\n", formatBool(status.AutoSync))
-	
+
 	if status.AutoSync {
 		fmt.Printf("   同步间隔: %d分钟\n", status.SyncInterval)
 	}
-	
+
 	fmt.Printf("   %s\n", status.Message)
-	
+
 	// 显示加密状态
 	if mirrorManager.GetConfig().Sync != nil {
 		fmt.Printf("   全量同步: 是（包含加密的API密钥）\n")
@@ -368,18 +369,18 @@ func runSyncConfig(cmd *cobra.Command, args []string) error {
 		if len(syncEncryptPwd) < 8 {
 			return fmt.Errorf("加密密码长度至少8位")
 		}
-		
+
 		fmt.Printf("\n⚠️  更改加密密码:\n")
 		fmt.Printf("   - 更改密码后，之前的云端数据将无法解密\n")
 		fmt.Printf("   - 建议先备份当前配置\n")
 		fmt.Printf("是否继续？(y/N): ")
 		var confirm string
-		fmt.Scanln(&confirm)
+		_, _ = fmt.Scanln(&confirm)
 		if confirm != "y" && confirm != "Y" {
 			fmt.Printf("已取消更改\n")
 			return nil
 		}
-		
+
 		config.EncryptionPwd = syncEncryptPwd
 		fmt.Printf("   ✅ 加密密码已更新\n")
 		fmt.Printf("   💡 请使用 'codex-mirror sync push' 重新上传配置\n")

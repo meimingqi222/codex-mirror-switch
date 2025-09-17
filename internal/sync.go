@@ -39,10 +39,7 @@ func (sm *SyncManager) InitSyncWithPassword(providerType, endpoint, token, passw
 // InitSyncWithPasswordAndGist 使用密码和可选的Gist ID初始化云同步.
 func (sm *SyncManager) InitSyncWithPasswordAndGist(providerType, endpoint, token, password, gistID string) error {
 	// 生成设备ID
-	deviceID, err := generateDeviceID()
-	if err != nil {
-		return fmt.Errorf("生成设备ID失败: %w", err)
-	}
+	deviceID := generateDeviceID()
 
 	// 创建同步配置
 	syncConfig := &SyncConfig{
@@ -55,9 +52,9 @@ func (sm *SyncManager) InitSyncWithPasswordAndGist(providerType, endpoint, token
 		SyncInterval:  30,
 		DeviceID:      deviceID,
 		LastSync:      time.Time{},
-		SyncAPIKeys:   true,  // 默认总是同步API密钥
+		SyncAPIKeys:   true,     // 默认总是同步API密钥
 		EncryptionPwd: password, // 使用用户提供的密码
-		GistID:        gistID, // 可选的现有Gist ID
+		GistID:        gistID,   // 可选的现有Gist ID
 	}
 
 	// 创建提供商实例
@@ -74,7 +71,7 @@ func (sm *SyncManager) InitSyncWithPasswordAndGist(providerType, endpoint, token
 		if discoveredID := gistProvider.GetGistID(); discoveredID != "" && syncConfig.GistID == "" {
 			syncConfig.GistID = discoveredID
 			fmt.Printf("🔍 自动发现现有配置 Gist: %s\n", discoveredID)
-			
+
 			// 验证密码是否正确
 			if err := sm.validatePassword(); err != nil {
 				return fmt.Errorf("密码验证失败: %w\n\n💡 可能原因:\n   - 密码输入错误\n   - 此Gist使用了不同的密码\n\n🔧 解决方法:\n   - 检查密码是否正确\n   - 或使用 --gist-id 参数指定新的Gist", err)
@@ -94,7 +91,7 @@ func (sm *SyncManager) InitSyncWithPasswordAndGist(providerType, endpoint, token
 	fmt.Printf("   设备ID: %s\n", deviceID)
 	fmt.Printf("   端点: %s\n", endpoint)
 	fmt.Printf("   全量同步: 启用\n")
-	
+
 	if syncConfig.GistID != "" {
 		fmt.Printf("   Gist ID: %s\n", syncConfig.GistID)
 		fmt.Printf("   💡 可以直接使用 'codex-mirror sync pull' 拉取现有配置\n")
@@ -108,10 +105,7 @@ func (sm *SyncManager) InitSyncWithPasswordAndGist(providerType, endpoint, token
 // InitSyncWithOptions 初始化云同步（带选项）- 保持向后兼容.
 func (sm *SyncManager) InitSyncWithOptions(providerType, endpoint, token string, syncAPIKeys bool) error {
 	// 生成设备ID
-	deviceID, err := generateDeviceID()
-	if err != nil {
-		return fmt.Errorf("生成设备ID失败: %w", err)
-	}
+	deviceID := generateDeviceID()
 
 	// 生成加密密钥
 	encryptKey, err := generateEncryptKey()
@@ -193,7 +187,7 @@ func (sm *SyncManager) PushWithStrategy(strategy string) error {
 	fmt.Printf("📤 正在推送配置到云端...\n")
 
 	// 首先检查是否存在云端配置，如果存在则进行冲突检查
-	filename := "codex-mirror-config.json"
+	filename := ConfigFileName
 	if encryptedRemoteData, err := sm.provider.Download(filename); err == nil {
 		fmt.Printf("🔍 检查云端配置冲突...\n")
 		// 解密远程数据
@@ -230,11 +224,11 @@ func (sm *SyncManager) handlePushConflicts(resolver *ConflictResolver, conflicts
 	fmt.Printf("%s", resolver.FormatConflicts(conflicts))
 
 	switch strategy {
-	case "auto", "merge":
+	case "auto", StrategyMerge:
 		return sm.handlePushAutoResolve(resolver, conflicts, remoteSyncData)
 	case "force":
 		fmt.Printf("🚀 强制推送模式，覆盖云端配置...\n")
-		return sm.performPush("codex-mirror-config.json")
+		return sm.performPush(ConfigFileName)
 	case "manual":
 		return fmt.Errorf("检测到配置冲突，请选择解决策略:\n\n" +
 			"  codex-mirror sync push --strategy=force  # 强制覆盖云端配置\n" +
@@ -247,11 +241,11 @@ func (sm *SyncManager) handlePushConflicts(resolver *ConflictResolver, conflicts
 }
 
 // handlePushAutoResolve 自动解决推送冲突.
-func (sm *SyncManager) handlePushAutoResolve(resolver *ConflictResolver, conflicts *ConflictResolution, remoteSyncData *SyncData) error {
+func (sm *SyncManager) handlePushAutoResolve(resolver *ConflictResolver, conflicts *ConflictResolution, _ *SyncData) error {
 	fmt.Printf("🔄 自动合并本地和云端配置...\n")
-	
+
 	// 使用合并策略解决冲突
-	resolvedConfig, err := resolver.ResolveConflicts(conflicts, "merge")
+	resolvedConfig, err := resolver.ResolveConflicts(conflicts, StrategyMerge)
 	if err != nil {
 		return fmt.Errorf("自动解决冲突失败: %w", err)
 	}
@@ -273,7 +267,7 @@ func (sm *SyncManager) handlePushAutoResolve(resolver *ConflictResolver, conflic
 	fmt.Printf("   - 新增的镜像源需要手动配置API密钥\n\n")
 
 	// 现在推送合并后的配置
-	return sm.performPush("codex-mirror-config.json")
+	return sm.performPush(ConfigFileName)
 }
 
 // performPush 执行实际的推送操作.
@@ -334,7 +328,7 @@ func (sm *SyncManager) PullWithStrategy(strategy string) error {
 	}
 
 	// 直接使用标准配置文件名
-	filename := "codex-mirror-config.json"
+	filename := ConfigFileName
 	fmt.Printf("📥 正在从云端拉取配置...\n")
 
 	// 下载数据
@@ -397,13 +391,13 @@ func (sm *SyncManager) handleConflicts(resolver *ConflictResolver, conflicts *Co
 	var err error
 
 	switch strategy {
-	case "auto", "merge":
+	case "auto", StrategyMerge:
 		fmt.Printf("🔄 使用智能合并策略解决冲突...\n")
-		resolvedConfig, err = resolver.ResolveConflicts(conflicts, "merge")
+		resolvedConfig, err = resolver.ResolveConflicts(conflicts, StrategyMerge)
 		if err != nil {
 			return fmt.Errorf("自动解决冲突失败: %w", err)
 		}
-		
+
 		fmt.Printf("✅ 冲突已自动解决（智能合并）\n")
 		fmt.Printf("   - 保留了本地API密钥\n")
 		fmt.Printf("   - 合并了镜像源配置\n")
@@ -415,7 +409,7 @@ func (sm *SyncManager) handleConflicts(resolver *ConflictResolver, conflicts *Co
 		if err != nil {
 			return fmt.Errorf("本地优先解决冲突失败: %w", err)
 		}
-		
+
 		fmt.Printf("✅ 冲突已解决（本地优先）\n")
 		fmt.Printf("   - 保持本地配置不变\n")
 		fmt.Printf("   - 添加了云端新增的镜像源\n")
@@ -426,7 +420,7 @@ func (sm *SyncManager) handleConflicts(resolver *ConflictResolver, conflicts *Co
 		if err != nil {
 			return fmt.Errorf("远程优先解决冲突失败: %w", err)
 		}
-		
+
 		fmt.Printf("✅ 冲突已解决（远程优先）\n")
 		fmt.Printf("   - 使用云端配置\n")
 		fmt.Printf("   - 保留了本地API密钥\n")
@@ -506,11 +500,11 @@ func (sm *SyncManager) GetStatus() (*SyncStatus, error) {
 // exportSyncData 导出同步数据.
 func (sm *SyncManager) exportSyncData() *SyncData {
 	var mirrors []MirrorConfig
-	
+
 	// 总是包含API密钥（加密后）
 	for _, mirror := range sm.mirrorManager.config.Mirrors {
 		exportMirror := mirror
-		
+
 		// 如果有API密钥，进行加密
 		if mirror.APIKey != "" {
 			encryptedKey, err := sm.encryptAPIKey(mirror.APIKey)
@@ -522,7 +516,7 @@ func (sm *SyncManager) exportSyncData() *SyncData {
 				exportMirror.APIKey = encryptedKey
 			}
 		}
-		
+
 		mirrors = append(mirrors, exportMirror)
 	}
 
@@ -538,7 +532,7 @@ func (sm *SyncManager) exportSyncData() *SyncData {
 		DeviceID:      sm.config.DeviceID,
 		Version:       "3.0", // 新版本，总是包含加密的API密钥
 		Checksum:      checksum,
-		HasAPIKeys:    true,  // 总是为true
+		HasAPIKeys:    true, // 总是为true
 	}
 }
 
@@ -573,7 +567,7 @@ func (sm *SyncManager) applySyncData(syncData *SyncData) error {
 		case ToolTypeCodex:
 			newMirror.EnvKey = CodexSwitchAPIKeyEnv
 		case ToolTypeClaude:
-			newMirror.EnvKey = "ANTHROPIC_AUTH_TOKEN"
+			newMirror.EnvKey = AnthropicAuthTokenEnv
 		}
 
 		newMirrors = append(newMirrors, newMirror)
@@ -611,11 +605,11 @@ func (sm *SyncManager) encryptData(data []byte) ([]byte, error) {
 	if password == "" {
 		password = sm.config.EncryptKey
 	}
-	
+
 	if password == "" {
 		return nil, fmt.Errorf("未设置加密密码")
 	}
-	
+
 	crypto := NewCryptoManager(password)
 	return crypto.Encrypt(data)
 }
@@ -627,11 +621,11 @@ func (sm *SyncManager) decryptData(encryptedData []byte) ([]byte, error) {
 	if password == "" {
 		password = sm.config.EncryptKey
 	}
-	
+
 	if password == "" {
 		return nil, fmt.Errorf("未设置加密密码")
 	}
-	
+
 	crypto := NewCryptoManager(password)
 	return crypto.Decrypt(encryptedData)
 }
@@ -652,20 +646,20 @@ func (sm *SyncManager) decryptAPIKey(encryptedKey string) (string, error) {
 	if !strings.HasPrefix(encryptedKey, "enc:") {
 		return encryptedKey, nil // 未加密的密钥直接返回
 	}
-	
+
 	// 移除前缀并解码hex
 	hexData := strings.TrimPrefix(encryptedKey, "enc:")
 	encrypted, err := hex.DecodeString(hexData)
 	if err != nil {
 		return "", fmt.Errorf("解码加密数据失败: %w", err)
 	}
-	
+
 	// 解密
 	decrypted, err := sm.decryptData(encrypted)
 	if err != nil {
 		return "", err
 	}
-	
+
 	return string(decrypted), nil
 }
 
@@ -676,7 +670,7 @@ func (sm *SyncManager) validatePassword() error {
 	}
 
 	// 尝试下载现有配置
-	filename := "codex-mirror-config.json"
+	filename := ConfigFileName
 	encryptedData, err := sm.provider.Download(filename)
 	if err != nil {
 		// 如果下载失败，可能是第一次设置，不需要验证
@@ -707,18 +701,16 @@ type SyncStatus struct {
 // 辅助函数
 
 // generateDeviceID 生成设备ID.
-func generateDeviceID() (string, error) {
+func generateDeviceID() string {
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = "unknown"
 	}
-	
-	// 使用hostname + 固定字符串生成稳定的哈希后缀
-	// 这样同一台机器总是生成相同的设备ID
+
 	hash := md5.Sum([]byte(hostname + "codex-mirror-device-v1"))
 	suffix := hex.EncodeToString(hash[:4]) // 使用前4字节作为8位十六进制后缀
-	
-	return fmt.Sprintf("%s-%s", hostname, suffix), nil
+
+	return fmt.Sprintf("%s-%s", hostname, suffix)
 }
 
 // generateEncryptKey 生成加密密钥.
@@ -738,13 +730,14 @@ func calculateChecksum(data []byte) string {
 
 // formatDuration 格式化时间间隔.
 func formatDuration(d time.Duration) string {
-	if d < time.Minute {
+	switch {
+	case d < time.Minute:
 		return fmt.Sprintf("%.0f秒", d.Seconds())
-	} else if d < time.Hour {
+	case d < time.Hour:
 		return fmt.Sprintf("%.0f分钟", d.Minutes())
-	} else if d < 24*time.Hour {
+	case d < 24*time.Hour:
 		return fmt.Sprintf("%.1f小时", d.Hours())
-	} else {
+	default:
 		return fmt.Sprintf("%.1f天", d.Hours()/24)
 	}
 }
@@ -752,88 +745,88 @@ func formatDuration(d time.Duration) string {
 // handleManualConflictResolution 处理手动冲突解决.
 func (sm *SyncManager) handleManualConflictResolution(resolver *ConflictResolver, conflicts *ConflictResolution, syncData *SyncData) error {
 	fmt.Printf("🤔 需要手动解决冲突，请选择解决策略:\n\n")
-	
+
 	fmt.Printf("可用策略:\n")
 	fmt.Printf("  1. merge  - 智能合并本地和云端配置（推荐）\n")
 	fmt.Printf("  2. local  - 保持本地配置优先，仅添加云端新增项\n")
 	fmt.Printf("  3. remote - 使用云端配置优先，保留本地API密钥\n")
 	fmt.Printf("  4. abort  - 取消操作，不应用任何更改\n\n")
-	
+
 	strategy := sm.promptUserChoice()
 	if strategy == "" {
 		return fmt.Errorf("用户取消操作")
 	}
-	
-	if strategy == "abort" {
+
+	if strategy == StrategyAbort {
 		fmt.Printf("❌ 操作已取消，本地配置未更改\n")
 		return fmt.Errorf("用户取消同步操作")
 	}
-	
+
 	// 使用用户选择的策略解决冲突
 	resolvedConfig, err := resolver.ResolveConflicts(conflicts, strategy)
 	if err != nil {
 		return fmt.Errorf("解决冲突失败: %w", err)
 	}
-	
+
 	// 显示将要应用的更改
 	fmt.Printf("\n📋 将要应用的更改:\n")
 	sm.showConfigChanges(sm.mirrorManager.config, resolvedConfig)
-	
+
 	if !sm.confirmChanges() {
 		fmt.Printf("❌ 操作已取消，本地配置未更改\n")
 		return fmt.Errorf("用户取消应用更改")
 	}
-	
+
 	// 创建备份
 	if err := sm.createBackup(); err != nil {
 		fmt.Printf("警告: 创建备份失败: %v\n", err)
 	}
-	
+
 	// 应用解决后的配置
 	sm.mirrorManager.config = resolvedConfig
 	if err := sm.mirrorManager.saveConfig(); err != nil {
 		return fmt.Errorf("保存解决后的配置失败: %w", err)
 	}
-	
+
 	// 更新最后同步时间
 	sm.config.LastSync = time.Now()
 	sm.mirrorManager.config.Sync = sm.config
 	if err := sm.mirrorManager.saveConfig(); err != nil {
 		return fmt.Errorf("保存同步时间失败: %w", err)
 	}
-	
+
 	fmt.Printf("\n✅ 冲突已解决并应用\n")
 	fmt.Printf("   来源设备: %s\n", syncData.DeviceID)
 	fmt.Printf("   配置时间: %s\n", syncData.Timestamp.Format("2006-01-02 15:04:05"))
 	fmt.Printf("   解决策略: %s\n", strategy)
-	
+
 	return nil
 }
 
 // promptUserChoice 提示用户选择策略.
 func (sm *SyncManager) promptUserChoice() string {
 	reader := bufio.NewReader(os.Stdin)
-	
+
 	for {
 		fmt.Printf("请选择策略 [1-4] 或 [merge/local/remote/abort]: ")
-		
+
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			fmt.Printf("读取输入错误: %v\n", err)
 			continue
 		}
-		
+
 		input = strings.TrimSpace(strings.ToLower(input))
-		
+
 		switch input {
 		case "1", "merge":
-			return "merge"
+			return StrategyMerge
 		case "2", "local":
-			return "local"
+			return StrategyLocal
 		case "3", "remote":
-			return "remote"
+			return StrategyRemote
 		case "4", "abort":
-			return "abort"
+			return StrategyAbort
 		default:
 			fmt.Printf("❌ 无效输入，请输入 1-4 或对应的策略名称\n")
 		}
@@ -843,32 +836,32 @@ func (sm *SyncManager) promptUserChoice() string {
 // showConfigChanges 显示配置更改.
 func (sm *SyncManager) showConfigChanges(currentConfig, newConfig *SystemConfig) {
 	fmt.Printf("   镜像源变化:\n")
-	
+
 	// 创建映射便于比较
 	currentMirrors := make(map[string]MirrorConfig)
 	for _, mirror := range currentConfig.Mirrors {
 		currentMirrors[mirror.Name] = mirror
 	}
-	
+
 	newMirrors := make(map[string]MirrorConfig)
 	for _, mirror := range newConfig.Mirrors {
 		newMirrors[mirror.Name] = mirror
 	}
-	
+
 	// 检查新增的镜像源
 	for name, newMirror := range newMirrors {
 		if _, exists := currentMirrors[name]; !exists {
 			fmt.Printf("     + 新增: %s (%s)\n", name, newMirror.BaseURL)
 		}
 	}
-	
+
 	// 检查删除的镜像源
 	for name, currentMirror := range currentMirrors {
 		if _, exists := newMirrors[name]; !exists {
 			fmt.Printf("     - 删除: %s (%s)\n", name, currentMirror.BaseURL)
 		}
 	}
-	
+
 	// 检查修改的镜像源
 	for name, newMirror := range newMirrors {
 		if currentMirror, exists := currentMirrors[name]; exists {
@@ -877,7 +870,7 @@ func (sm *SyncManager) showConfigChanges(currentConfig, newConfig *SystemConfig)
 			}
 		}
 	}
-	
+
 	// 检查当前激活源变化
 	if currentConfig.CurrentCodex != newConfig.CurrentCodex {
 		fmt.Printf("   当前Codex镜像: %s -> %s\n", currentConfig.CurrentCodex, newConfig.CurrentCodex)
@@ -890,18 +883,18 @@ func (sm *SyncManager) showConfigChanges(currentConfig, newConfig *SystemConfig)
 // confirmChanges 确认是否应用更改.
 func (sm *SyncManager) confirmChanges() bool {
 	reader := bufio.NewReader(os.Stdin)
-	
+
 	for {
 		fmt.Printf("\n是否应用这些更改? [y/N]: ")
-		
+
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			fmt.Printf("读取输入错误: %v\n", err)
 			continue
 		}
-		
+
 		input = strings.TrimSpace(strings.ToLower(input))
-		
+
 		switch input {
 		case "y", "yes", "是":
 			return true
@@ -912,5 +905,3 @@ func (sm *SyncManager) confirmChanges() bool {
 		}
 	}
 }
-
-
