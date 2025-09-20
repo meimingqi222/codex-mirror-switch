@@ -100,7 +100,7 @@ func (em *EnvManager) setWindowsUserEnvVarNoRefresh(envKey, value string) error 
 	if err != nil {
 		return fmt.Errorf("执行 setx 命令失败: %v, 输出: %s", err, string(output))
 	}
-	fmt.Printf("✓ 环境变量 %s 已设置\n", envKey)
+	fmt.Printf("[OK] 环境变量 %s 已设置\n", envKey)
 	return nil
 }
 
@@ -132,7 +132,7 @@ func setUnixUserEnvVar(envKey, value string, shellFileNames []string) error {
 		return fmt.Errorf("无法更新任何 shell 配置文件")
 	}
 
-	fmt.Printf("✓ 环境变量 %s 已添加到 shell 配置文件\n", envKey)
+	fmt.Printf("[OK] 环境变量 %s 已添加到 shell 配置文件\n", envKey)
 	return nil
 }
 
@@ -248,7 +248,7 @@ func (em *EnvManager) unsetEnvironmentVariable(envKey string) {
 		if err != nil {
 			fmt.Printf("警告: 清除环境变量 %s 失败: %v, 输出: %s\n", envKey, err, string(output))
 		} else {
-			fmt.Printf("✓ 环境变量 %s 已清除\n", envKey)
+			fmt.Printf("[OK] 环境变量 %s 已清除\n", envKey)
 		}
 		return
 	case PlatformMac:
@@ -305,7 +305,7 @@ func (em *EnvManager) unsetUnixEnvVar(envKey string, shellFiles []string) {
 	}
 
 	if updated {
-		fmt.Printf("✓ 环境变量 %s 已从 shell 配置文件中清除\n", envKey)
+		fmt.Printf("[OK] 环境变量 %s 已从 shell 配置文件中清除\n", envKey)
 	}
 }
 

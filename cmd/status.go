@@ -79,7 +79,7 @@ func checkClaudeStatus(mm *internal.MirrorManager) {
 	case baseURL == "":
 		fmt.Printf("❌ 未设置\n")
 	case urlMatch:
-		fmt.Printf("✓ 正确\n")
+		fmt.Printf("[OK] 正确\n")
 	default:
 		fmt.Printf("⚠️  不匹配 (当前: %s, 期望: %s)\n", baseURL, currentClaude.BaseURL)
 	}
@@ -89,7 +89,7 @@ func checkClaudeStatus(mm *internal.MirrorManager) {
 	case authToken == "":
 		fmt.Printf("❌ 未设置\n")
 	case tokenMatch:
-		fmt.Printf("✓ 正确\n")
+		fmt.Printf("[OK] 正确\n")
 	default:
 		fmt.Printf("⚠️  不匹配\n")
 	}
@@ -146,14 +146,14 @@ func checkCodexStatus(mm *internal.MirrorManager) {
 
 	fmt.Printf("  配置文件 (~/.codex/config.toml): ")
 	if configMatch {
-		fmt.Printf("✓ 正确\n")
+		fmt.Printf("[OK] 正确\n")
 	} else {
 		fmt.Printf("⚠️  不匹配 (当前: %s)\n", currentBaseURL)
 	}
 
 	fmt.Printf("  认证文件 (~/.codex/auth.json): ")
 	if authMatch {
-		fmt.Printf("✓ 正确\n")
+		fmt.Printf("[OK] 正确\n")
 	} else {
 		fmt.Printf("⚠️  不匹配\n")
 	}
@@ -163,7 +163,7 @@ func checkCodexStatus(mm *internal.MirrorManager) {
 	case envKey == "":
 		fmt.Printf("❌ 未设置\n")
 	case envMatch:
-		fmt.Printf("✓ 正确\n")
+		fmt.Printf("[OK] 正确\n")
 	default:
 		fmt.Printf("⚠️  不匹配\n")
 	}
@@ -202,7 +202,7 @@ func checkVSCodeStatus(mm *internal.MirrorManager) {
 
 	switch {
 	case apiBaseMatch:
-		fmt.Printf("  ✓ 配置正确 (chatgpt.apiBase: %s)\n", currentCodex.BaseURL)
+	fmt.Printf("  [OK] 配置正确 (chatgpt.apiBase: %s)\n", currentCodex.BaseURL)
 	case len(config) == 0:
 		fmt.Println("  ⚠️  未配置ChatGPT插件")
 	default:

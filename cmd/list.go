@@ -45,9 +45,9 @@ var listCmd = &cobra.Command{
 			// 确定状态
 			status := ""
 			if mirror.ToolType == internal.ToolTypeCodex && currentCodex != nil && mirror.Name == currentCodex.Name {
-				status = "✓"
+				status = "*"
 			} else if mirror.ToolType == internal.ToolTypeClaude && currentClaude != nil && mirror.Name == currentClaude.Name {
-				status = "✓"
+				status = "*"
 			}
 
 			// 截断过长的URL
