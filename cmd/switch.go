@@ -160,7 +160,7 @@ func applyCodexConfig(mirror *internal.MirrorConfig) error {
 		if err := updateVSCodeConfig(mirror); err != nil {
 			return err
 		}
-	fmt.Println("[OK] VS Code配置已更新")
+		fmt.Println("[OK] VS Code配置已更新")
 	}
 
 	return nil

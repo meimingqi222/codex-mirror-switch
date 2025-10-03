@@ -202,7 +202,7 @@ func checkVSCodeStatus(mm *internal.MirrorManager) {
 
 	switch {
 	case apiBaseMatch:
-	fmt.Printf("  [OK] 配置正确 (chatgpt.apiBase: %s)\n", currentCodex.BaseURL)
+		fmt.Printf("  [OK] 配置正确 (chatgpt.apiBase: %s)\n", currentCodex.BaseURL)
 	case len(config) == 0:
 		fmt.Println("  ⚠️  未配置ChatGPT插件")
 	default:

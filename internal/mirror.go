@@ -44,6 +44,22 @@ func NewMirrorManager() (*MirrorManager, error) {
 	return mm, nil
 }
 
+// NewMirrorManagerWithPath 使用指定路径创建新的镜像源管理器.
+func NewMirrorManagerWithPath(configPath string) (*MirrorManager, error) {
+	mm := &MirrorManager{
+		configPath: configPath,
+		config:     &SystemConfig{},
+	}
+
+	// 尝试加载现有配置
+	if err := mm.loadConfig(); err != nil {
+		// 如果配置文件不存在，检查是否有已存在的环境变量
+		mm.discoverFromEnvironment()
+	}
+
+	return mm, nil
+}
+
 // loadConfig 加载配置文件.
 func (mm *MirrorManager) loadConfig() error {
 	if _, err := os.Stat(mm.configPath); os.IsNotExist(err) {

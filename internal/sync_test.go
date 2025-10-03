@@ -1,9 +1,12 @@
 package internal
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -173,12 +176,12 @@ func TestLoadSync(t *testing.T) {
 			if tt.setupSync {
 				// 设置同步配置
 				mm.config.Sync = &SyncConfig{
-					Enabled:      true,
-					Provider:     "gist",
-					Endpoint:     "https://api.github.com",
-					Token:        "test-token",
-					DeviceID:     "test-device",
-					SyncAPIKeys:  true,
+					Enabled:       true,
+					Provider:      "gist",
+					Endpoint:      "https://api.github.com",
+					Token:         "test-token",
+					DeviceID:      "test-device",
+					SyncAPIKeys:   true,
 					EncryptionPwd: "test-password",
 				}
 			} else {
@@ -197,11 +200,9 @@ func TestLoadSync(t *testing.T) {
 					t.Error("Config should match MirrorManager's sync config")
 				}
 				// 注意：provider可能为nil，因为网络连接会失败，这是预期的
-			} else {
+			} else if err == nil {
 				// 无配置时应该返回错误
-				if err == nil {
-					t.Error("LoadSync() should return error when no sync config")
-				}
+				t.Error("LoadSync() should return error when no sync config")
 			}
 		})
 	}
@@ -277,27 +278,34 @@ func TestApplySyncData(t *testing.T) {
 	sm := NewSyncManager(mm)
 
 	// 创建测试同步数据
+	mirrors := []MirrorConfig{
+		{
+			Name:     "sync-mirror1",
+			BaseURL:  "https://api.sync1.com",
+			APIKey:   "sync-key1",
+			ToolType: ToolTypeCodex,
+		},
+		{
+			Name:     "sync-mirror2",
+			BaseURL:  "https://api.sync2.com",
+			APIKey:   "sync-key2",
+			ToolType: ToolTypeClaude,
+		},
+	}
+
+	// 计算校验和
+	data, _ := json.Marshal(mirrors)
+	checksum := calculateChecksum(data)
+
 	syncData := &SyncData{
 		CurrentCodex:  "sync-codex",
 		CurrentClaude: "sync-claude",
-		Mirrors: []MirrorConfig{
-			{
-				Name:     "sync-mirror1",
-				BaseURL:  "https://api.sync1.com",
-				APIKey:   "sync-key1",
-				ToolType: ToolTypeCodex,
-			},
-			{
-				Name:     "sync-mirror2",
-				BaseURL:  "https://api.sync2.com",
-				APIKey:   "sync-key2",
-				ToolType: ToolTypeClaude,
-			},
-		},
-		Timestamp: time.Now(),
-		DeviceID:  "remote-device",
-		Version:   "1.0.0",
-		HasAPIKeys: true,
+		Mirrors:       mirrors,
+		Timestamp:     time.Now(),
+		DeviceID:      "remote-device",
+		Version:       "3.0",
+		Checksum:      checksum,
+		HasAPIKeys:    true,
 	}
 
 	err := sm.applySyncData(syncData)
@@ -368,7 +376,7 @@ func TestEncryptDecryptData(t *testing.T) {
 	}
 
 	// 加密后的数据应该与原数据不同
-	if string(encryptedData) == string(testData) {
+	if bytes.Equal(encryptedData, testData) {
 		t.Error("Encrypted data should be different from original data")
 	}
 
@@ -379,7 +387,7 @@ func TestEncryptDecryptData(t *testing.T) {
 	}
 
 	// 解密后的数据应该与原数据相同
-	if string(decryptedData) != string(testData) {
+	if !bytes.Equal(decryptedData, testData) {
 		t.Errorf("Decrypted data = %v, expected %v", string(decryptedData), string(testData))
 	}
 }
@@ -397,19 +405,31 @@ func TestEncryptDataWithEmptyPassword(t *testing.T) {
 
 	testData := []byte("Test data with empty password")
 
-	// 空密码时应该仍能加密（可能使用默认密钥或直接返回）
+	// 空密码时应该返回错误
 	encryptedData, err := sm.encryptData(testData)
+	if err == nil {
+		t.Error("encryptData() with empty password should return error")
+	}
+
+	if encryptedData != nil {
+		t.Error("encryptData() with empty password should return nil data")
+	}
+
+	// 设置一个有效的密码再测试
+	sm.config.EncryptionPwd = "valid-password"
+
+	encryptedData, err = sm.encryptData(testData)
 	if err != nil {
-		t.Fatalf("encryptData() with empty password error = %v", err)
+		t.Fatalf("encryptData() with valid password error = %v", err)
 	}
 
 	// 测试解密
 	decryptedData, err := sm.decryptData(encryptedData)
 	if err != nil {
-		t.Fatalf("decryptData() with empty password error = %v", err)
+		t.Fatalf("decryptData() with valid password error = %v", err)
 	}
 
-	if string(decryptedData) != string(testData) {
+	if !bytes.Equal(decryptedData, testData) {
 		t.Errorf("Decrypted data = %v, expected %v", string(decryptedData), string(testData))
 	}
 }
@@ -418,7 +438,7 @@ func TestEncryptDataWithEmptyPassword(t *testing.T) {
 func TestGenerateDeviceID(t *testing.T) {
 	deviceID := generateDeviceID()
 
-	if len(deviceID) == 0 {
+	if deviceID == "" {
 		t.Error("Device ID should not be empty")
 	}
 
@@ -451,7 +471,7 @@ func TestGenerateEncryptKey(t *testing.T) {
 		t.Fatalf("generateEncryptKey() error = %v", err)
 	}
 
-	if len(key) == 0 {
+	if key == "" {
 		t.Error("Encrypt key should not be empty")
 	}
 
@@ -576,7 +596,7 @@ func TestMockSyncProvider(t *testing.T) {
 		t.Errorf("Download() error = %v", err)
 	}
 
-	if string(downloadedData) != string(testData) {
+	if !bytes.Equal(downloadedData, testData) {
 		t.Errorf("Downloaded data = %v, expected %v", string(downloadedData), string(testData))
 	}
 
@@ -636,4 +656,44 @@ func TestProviderInfo(t *testing.T) {
 	if deserializedInfo.Name != info.Name {
 		t.Errorf("Name = %v, expected %v", deserializedInfo.Name, info.Name)
 	}
+}
+
+// setupTestDir 创建测试目录.
+func setupTestDir(t *testing.T) string {
+	tempDir, err := os.MkdirTemp("", "codex-mirror-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+
+	// 清理函数
+	t.Cleanup(func() {
+		os.RemoveAll(tempDir)
+	})
+
+	return tempDir
+}
+
+// createTestMirrorManager 创建测试用的镜像管理器.
+func createTestMirrorManager(t *testing.T, tempDir string) *MirrorManager {
+	// 创建测试配置文件路径
+	configPath := filepath.Join(tempDir, "mirrors.toml")
+
+	// 创建初始配置
+	initialConfig := `# Codex Mirror Switch Configuration
+current_codex = ""
+current_claude = ""
+`
+
+	err := os.WriteFile(configPath, []byte(initialConfig), 0o644)
+	if err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	// 创建镜像管理器
+	mm, err := NewMirrorManagerWithPath(configPath)
+	if err != nil {
+		t.Fatalf("Failed to create mirror manager: %v", err)
+	}
+
+	return mm
 }
