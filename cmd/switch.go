@@ -140,7 +140,7 @@ func applyClaudeConfig(mirror *internal.MirrorConfig) error {
 	}
 
 	// 显示设置的环境变量
-	fmt.Println("✓ Claude Code环境变量已设置")
+	fmt.Println("[OK] Claude Code环境变量已设置")
 	if mirror.ModelName != "" {
 		fmt.Printf("  模型: %s\n", mirror.ModelName)
 	}
@@ -153,14 +153,14 @@ func applyCodexConfig(mirror *internal.MirrorConfig) error {
 	if err := updateCodexConfig(mirror); err != nil {
 		return err
 	}
-	fmt.Println("✓ Codex CLI配置已更新")
+	fmt.Println("[OK] Codex CLI配置已更新")
 
 	// 更新VS Code配置
 	if !vscodeOnly {
 		if err := updateVSCodeConfig(mirror); err != nil {
 			return err
 		}
-		fmt.Println("✓ VS Code配置已更新")
+	fmt.Println("[OK] VS Code配置已更新")
 	}
 
 	return nil

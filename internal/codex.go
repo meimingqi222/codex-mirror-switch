@@ -362,7 +362,7 @@ func (ccm *CodexConfigManager) setWindowsUserEnvVar(envKey, apiKey string) error
 	if err != nil {
 		return fmt.Errorf("执行setx命令失败: %v, 输出: %s", err, string(output))
 	}
-	fmt.Printf("✓ 环境变量 %s 已设置\n", envKey)
+	fmt.Printf("[OK] 环境变量 %s 已设置\n", envKey)
 	return nil
 }
 
