@@ -172,6 +172,9 @@ func updateShellProfile(shellFile, envKey, envLine string) error {
 		lines = append(lines, "", "# Codex Mirror Switch - API Key", envLine)
 	}
 
+	// 清理多余的空行和连续的注释
+	lines = cleanupExtraLines(lines)
+
 	// 写回文件
 	newContent := strings.Join(lines, "\n")
 	if err := os.WriteFile(shellFile, []byte(newContent), 0o644); err != nil {
@@ -200,6 +203,10 @@ func cleanupOldCodexEnvVars(lines []string) []string {
 			if shouldCleanupEnvVar(nextTrimmed) {
 				i += 2 // 跳过注释行和环境变量行
 				continue
+			} else {
+				// 如果下一行不是要清理的环境变量，但注释行看起来是孤立的，跳过注释行
+				i += 1
+				continue
 			}
 		}
 
@@ -219,8 +226,8 @@ func cleanupOldCodexEnvVars(lines []string) []string {
 
 // shouldCleanupEnvVar 判断是否应该清理该环境变量行.
 func shouldCleanupEnvVar(line string) bool {
-	// 跳过旧的 CODEX_*_API_KEY 环境变量
-	if strings.HasPrefix(line, "export CODEX_") && strings.HasSuffix(line, "_API_KEY=") {
+	// 跳过所有 CODEX_*_API_KEY 环境变量（包括 CODEX_SWITCH_API_KEY）
+	if strings.HasPrefix(line, "export CODEX_") && strings.Contains(line, "_API_KEY=") {
 		return true
 	}
 
@@ -230,6 +237,43 @@ func shouldCleanupEnvVar(line string) bool {
 	}
 
 	return false
+}
+
+// cleanupExtraLines 清理多余的空行和连续的注释.
+func cleanupExtraLines(lines []string) []string {
+	var cleanedLines []string
+	prevEmpty := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		isEmpty := trimmed == ""
+
+		// 跳过连续的空行
+		if isEmpty && prevEmpty {
+			continue
+		}
+
+		// 跳过孤立的 "# Codex Mirror Switch - API Key" 注释行
+		if trimmed == "# Codex Mirror Switch - API Key" || trimmed == "# Codex Mirror Switch - API Key." {
+			// 检查下一行是否是要保留的环境变量
+			continue
+		}
+
+		cleanedLines = append(cleanedLines, line)
+		prevEmpty = isEmpty
+	}
+
+	// 移除末尾的空行
+	for len(cleanedLines) > 0 && strings.TrimSpace(cleanedLines[len(cleanedLines)-1]) == "" {
+		cleanedLines = cleanedLines[:len(cleanedLines)-1]
+	}
+
+	return cleanedLines
+}
+
+// CleanupOldCodexEnvVars 导出版本的清理函数，用于测试.
+func CleanupOldCodexEnvVars(lines []string) []string {
+	return cleanupOldCodexEnvVars(lines)
 }
 
 // unsetEnvironmentVariable 清除环境变量(适用于可选变量).
