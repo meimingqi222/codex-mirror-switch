@@ -573,6 +573,373 @@ func TestCreateBackup(t *testing.T) {
 	// 具体的备份验证需要依赖实际的备份实现
 }
 
+// TestIntelligentMergeWithDeletions 测试智能合并策略处理删除操作.
+func TestIntelligentMergeWithDeletions(t *testing.T) {
+	tempDir := setupTestDir(t)
+	mm := createTestMirrorManager(t, tempDir)
+	_ = NewSyncManager(mm) // 用于创建测试环境，但不直接使用
+
+	now := time.Now()
+	testDeletedMirrorName := "deleted-mirror"
+
+	// 设置本地配置：包含一个已删除的镜像源
+	localConfig := &SystemConfig{
+		CurrentCodex:  "local-codex",
+		CurrentClaude: "local-claude",
+		Mirrors: []MirrorConfig{
+			{
+				Name:         "existing-mirror",
+				BaseURL:      "https://existing.local.com",
+				APIKey:       "local-key",
+				ToolType:     ToolTypeCodex,
+				CreatedAt:    now.Add(-2 * time.Hour),
+				LastModified: now.Add(-1 * time.Hour),
+				Deleted:      false,
+			},
+			{
+				Name:         testDeletedMirrorName,
+				BaseURL:      "https://deleted.local.com",
+				APIKey:       "deleted-key",
+				ToolType:     ToolTypeClaude,
+				CreatedAt:    now.Add(-3 * time.Hour),
+				LastModified: now.Add(-30 * time.Minute),
+				Deleted:      true,
+				DeletedAt:    now.Add(-30 * time.Minute),
+			},
+		},
+	}
+
+	// 设置远程数据：包含一个新镜像源和已删除的镜像源
+	remoteData := &SyncData{
+		CurrentCodex:  "remote-codex",
+		CurrentClaude: testDeletedMirrorName, // 远程仍然使用已删除的镜像源
+		Mirrors: []MirrorConfig{
+			{
+				Name:         "existing-mirror",
+				BaseURL:      "https://existing.remote.com", // 远程有不同的配置
+				ToolType:     ToolTypeCodex,
+				CreatedAt:    now.Add(-2 * time.Hour),
+				LastModified: now.Add(-45 * time.Minute),
+			},
+			{
+				Name:         testDeletedMirrorName,
+				BaseURL:      "https://deleted.remote.com",
+				ToolType:     ToolTypeClaude,
+				CreatedAt:    now.Add(-3 * time.Hour),
+				LastModified: now.Add(-1 * time.Hour),
+			},
+			{
+				Name:         "new-remote-mirror",
+				BaseURL:      "https://new.remote.com",
+				ToolType:     ToolTypeCodex,
+				CreatedAt:    now.Add(-20 * time.Minute),
+				LastModified: now.Add(-20 * time.Minute),
+			},
+		},
+		Timestamp: now,
+		DeviceID:  "remote-device",
+		Version:   "3.1",
+		DeletedMirrors: []MirrorConfig{
+			{
+				Name:         "remote-deleted-mirror",
+				BaseURL:      "https://remote-deleted.com",
+				ToolType:     ToolTypeClaude,
+				CreatedAt:    now.Add(-4 * time.Hour),
+				LastModified: now.Add(-2 * time.Hour),
+				Deleted:      true,
+				DeletedAt:    now.Add(-2 * time.Hour),
+			},
+		},
+	}
+
+	// 创建冲突解决器
+	resolver := NewConflictResolver(localConfig, remoteData)
+	conflicts := resolver.DetectConflicts()
+
+	// 验证冲突检测结果
+	if len(conflicts.Conflicts) == 0 {
+		t.Error("Expected conflicts to be detected, but none found")
+	}
+
+	// 测试智能合并
+	resolvedConfig, err := resolver.ResolveConflicts(conflicts, StrategyMerge)
+	if err != nil {
+		t.Fatalf("ResolveConflicts with merge strategy error = %v", err)
+	}
+
+	// 验证合并结果
+	foundExisting := false
+	foundNewRemote := false
+	foundDeleted := false
+
+	for _, mirror := range resolvedConfig.Mirrors {
+		if mirror.Name == "existing-mirror" {
+			foundExisting = true
+			// 应该保留本地API密钥
+			if mirror.APIKey != "local-key" {
+				t.Errorf("Expected local API key to be preserved, got: %v", mirror.APIKey)
+			}
+			// 应该使用远程的BaseURL
+			if mirror.BaseURL != "https://existing.remote.com" {
+				t.Errorf("Expected remote BaseURL, got: %v", mirror.BaseURL)
+			}
+		}
+
+		if mirror.Name == "new-remote-mirror" {
+			foundNewRemote = true
+			// 新的镜像源API密钥应该为空
+			if mirror.APIKey != "" {
+				t.Errorf("Expected empty API key for new remote mirror, got: %v", mirror.APIKey)
+			}
+		}
+
+		if mirror.Name == testDeletedMirrorName {
+			foundDeleted = true
+			t.Error("Deleted mirror should not be present in merged config")
+		}
+	}
+
+	if !foundExisting {
+		t.Error("Existing mirror should be present in merged config")
+	}
+
+	if !foundNewRemote {
+		t.Error("New remote mirror should be present in merged config")
+	}
+
+	if foundDeleted {
+		t.Error("Deleted mirror should not be present in merged config")
+	}
+
+	// 验证当前激活源选择（已删除的镜像源不应该被选择）
+	if resolvedConfig.CurrentClaude == testDeletedMirrorName {
+		t.Error("Deleted mirror should not be selected as current active source")
+	}
+}
+
+// TestConflictDetectionWithDeletedMirrors 测试删除镜像源的冲突检测.
+func TestConflictDetectionWithDeletedMirrors(t *testing.T) {
+	tempDir := setupTestDir(t)
+	_ = createTestMirrorManager(t, tempDir) // 用于创建测试环境，但不直接使用
+
+	now := time.Now()
+
+	// 测试场景1：本地主动删除，云端仍有
+	localConfig1 := &SystemConfig{
+		Mirrors: []MirrorConfig{
+			{
+				Name:         "test-mirror",
+				BaseURL:      "https://test.com",
+				ToolType:     ToolTypeCodex,
+				CreatedAt:    now.Add(-2 * time.Hour),
+				LastModified: now.Add(-30 * time.Minute),
+				Deleted:      true,
+				DeletedAt:    now.Add(-30 * time.Minute),
+			},
+		},
+	}
+
+	remoteData1 := &SyncData{
+		Mirrors: []MirrorConfig{
+			{
+				Name:         "test-mirror",
+				BaseURL:      "https://test.com",
+				ToolType:     ToolTypeCodex,
+				CreatedAt:    now.Add(-2 * time.Hour),
+				LastModified: now.Add(-45 * time.Minute),
+			},
+		},
+		Timestamp: now,
+		DeviceID:  "remote-device",
+		Version:   "3.1",
+	}
+
+	resolver1 := NewConflictResolver(localConfig1, remoteData1)
+	conflicts1 := resolver1.DetectConflicts()
+
+	// 应该检测到删除冲突
+	foundDeleteConflict := false
+	for _, conflict := range conflicts1.Conflicts {
+		if conflict.Type == ConflictTypeDeletedMirror && conflict.Name == "test-mirror" {
+			foundDeleteConflict = true
+			if !strings.Contains(conflict.Description, "本地删除了镜像源") {
+				t.Errorf("Expected deletion description, got: %v", conflict.Description)
+			}
+			break
+		}
+	}
+
+	// 调试输出
+	if !foundDeleteConflict {
+		t.Logf("Debug - found %d conflicts:", len(conflicts1.Conflicts))
+		for i, conflict := range conflicts1.Conflicts {
+			t.Logf("  %d: Type=%v, Name=%v, Desc=%v", i, conflict.Type, conflict.Name, conflict.Description)
+		}
+	}
+
+	if !foundDeleteConflict {
+		t.Error("Expected to find deletion conflict for locally deleted mirror")
+	}
+
+	// 测试场景2：云端删除，本地仍有
+	localConfig2 := &SystemConfig{
+		Mirrors: []MirrorConfig{
+			{
+				Name:         "test-mirror-2",
+				BaseURL:      "https://test2.com",
+				ToolType:     ToolTypeCodex,
+				CreatedAt:    now.Add(-2 * time.Hour),
+				LastModified: now.Add(-1 * time.Hour),
+			},
+		},
+	}
+
+	remoteData2 := &SyncData{
+		Mirrors: []MirrorConfig{},
+		DeletedMirrors: []MirrorConfig{
+			{
+				Name:         "test-mirror-2",
+				BaseURL:      "https://test2.com",
+				ToolType:     ToolTypeCodex,
+				CreatedAt:    now.Add(-2 * time.Hour),
+				LastModified: now.Add(-1 * time.Hour),
+				Deleted:      true,
+				DeletedAt:    now.Add(-15 * time.Minute),
+			},
+		},
+		Timestamp: now,
+		DeviceID:  "remote-device",
+		Version:   "3.1",
+	}
+
+	resolver2 := NewConflictResolver(localConfig2, remoteData2)
+	conflicts2 := resolver2.DetectConflicts()
+
+	// 应该检测到删除冲突
+	foundRemoteDeleteConflict := false
+	for _, conflict := range conflicts2.Conflicts {
+		if conflict.Type == ConflictTypeDeletedMirror && conflict.Name == "test-mirror-2" {
+			foundRemoteDeleteConflict = true
+			if !strings.Contains(conflict.Description, "云端被删除") {
+				t.Errorf("Expected remote deletion description, got: %v", conflict.Description)
+			}
+			break
+		}
+	}
+
+	if !foundRemoteDeleteConflict {
+		t.Error("Expected to find deletion conflict for remotely deleted mirror")
+	}
+}
+
+// TestMirrorManagerSoftDelete 测试软删除功能.
+func TestMirrorManagerSoftDelete(t *testing.T) {
+	tempDir := setupTestDir(t)
+	mm := createTestMirrorManager(t, tempDir)
+
+	// 添加测试镜像源
+	err := mm.AddMirror("test-mirror", "https://test.com", "test-key")
+	if err != nil {
+		t.Fatalf("AddMirror error = %v", err)
+	}
+
+	// 验证镜像源存在
+	activeMirrors := mm.ListActiveMirrors()
+	if len(activeMirrors) != 1 {
+		t.Errorf("Expected 1 active mirror, got: %d", len(activeMirrors))
+	}
+
+	// 软删除镜像源
+	err = mm.RemoveMirrorWithOptions("test-mirror", false)
+	if err != nil {
+		t.Fatalf("RemoveMirrorWithOptions error = %v", err)
+	}
+
+	// 验证镜像源不在活跃列表中
+	activeMirrors = mm.ListActiveMirrors()
+	if len(activeMirrors) != 0 {
+		t.Errorf("Expected 0 active mirrors after soft delete, got: %d", len(activeMirrors))
+	}
+
+	// 验证镜像源在已删除列表中
+	deletedMirrors := mm.ListDeletedMirrors()
+	if len(deletedMirrors) != 1 {
+		t.Errorf("Expected 1 deleted mirror, got: %d", len(deletedMirrors))
+	}
+
+	deletedMirror := deletedMirrors[0]
+	if !deletedMirror.Deleted {
+		t.Error("Expected mirror to be marked as deleted")
+	}
+
+	if deletedMirror.DeletedAt.IsZero() {
+		t.Error("Expected DeletedAt to be set")
+	}
+}
+
+// TestExportSyncDataWithDeletedMirrors 测试导出同步数据包含已删除镜像源.
+func TestExportSyncDataWithDeletedMirrors(t *testing.T) {
+	tempDir := setupTestDir(t)
+	mm := createTestMirrorManager(t, tempDir)
+	sm := NewSyncManager(mm)
+
+	// 设置同步配置
+	sm.config = &SyncConfig{
+		DeviceID:    "test-device",
+		SyncAPIKeys: true,
+	}
+
+	// 添加活跃和已删除的镜像源
+	now := time.Now()
+	mm.config.Mirrors = []MirrorConfig{
+		{
+			Name:         "active-mirror",
+			BaseURL:      "https://active.com",
+			APIKey:       "active-key",
+			ToolType:     ToolTypeCodex,
+			CreatedAt:    now.Add(-1 * time.Hour),
+			LastModified: now.Add(-30 * time.Minute),
+			Deleted:      false,
+		},
+		{
+			Name:         "deleted-mirror",
+			BaseURL:      "https://deleted.com",
+			APIKey:       "deleted-key",
+			ToolType:     ToolTypeClaude,
+			CreatedAt:    now.Add(-2 * time.Hour),
+			LastModified: now.Add(-45 * time.Minute),
+			Deleted:      true,
+			DeletedAt:    now.Add(-15 * time.Minute),
+		},
+	}
+
+	// 导出同步数据
+	syncData := sm.exportSyncData()
+
+	// 验证活跃镜像源
+	if len(syncData.Mirrors) != 1 {
+		t.Errorf("Expected 1 active mirror in sync data, got: %d", len(syncData.Mirrors))
+	}
+
+	if syncData.Mirrors[0].Name != "active-mirror" {
+		t.Errorf("Expected active-mirror, got: %v", syncData.Mirrors[0].Name)
+	}
+
+	// 验证已删除镜像源
+	if len(syncData.DeletedMirrors) != 1 {
+		t.Errorf("Expected 1 deleted mirror in sync data, got: %d", len(syncData.DeletedMirrors))
+	}
+
+	if syncData.DeletedMirrors[0].Name != "deleted-mirror" {
+		t.Errorf("Expected \"deleted-mirror\", got: %v", syncData.DeletedMirrors[0].Name)
+	}
+
+	// 验证版本号
+	if syncData.Version != "3.1" {
+		t.Errorf("Expected version 3.1, got: %v", syncData.Version)
+	}
+}
+
 // TestMockSyncProvider 测试模拟同步提供商.
 func TestMockSyncProvider(t *testing.T) {
 	provider := NewMockSyncProvider()

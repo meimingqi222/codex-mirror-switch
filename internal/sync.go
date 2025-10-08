@@ -500,10 +500,12 @@ func (sm *SyncManager) GetStatus() (*SyncStatus, error) {
 // exportSyncData 导出同步数据.
 func (sm *SyncManager) exportSyncData() *SyncData {
 	var mirrors []MirrorConfig
+	var deletedMirrors []MirrorConfig
 
 	// 总是包含API密钥（加密后）
-	for _, mirror := range sm.mirrorManager.config.Mirrors {
-		exportMirror := mirror
+	for i := range sm.mirrorManager.config.Mirrors {
+		mirror := &sm.mirrorManager.config.Mirrors[i]
+		exportMirror := *mirror
 
 		// 如果有API密钥，进行加密
 		if mirror.APIKey != "" {
@@ -517,7 +519,22 @@ func (sm *SyncManager) exportSyncData() *SyncData {
 			}
 		}
 
-		mirrors = append(mirrors, exportMirror)
+		// 确保时间戳不为零值
+		if exportMirror.CreatedAt.IsZero() {
+			exportMirror.CreatedAt = time.Now()
+		}
+		if exportMirror.LastModified.IsZero() {
+			exportMirror.LastModified = exportMirror.CreatedAt
+		}
+
+		// 分离已删除和活跃的镜像源
+		if exportMirror.Deleted && !exportMirror.DeletedAt.IsZero() {
+			// 已删除的镜像源
+			deletedMirrors = append(deletedMirrors, exportMirror)
+		} else {
+			// 活跃的镜像源
+			mirrors = append(mirrors, exportMirror)
+		}
 	}
 
 	// 计算数据校验和
@@ -525,14 +542,15 @@ func (sm *SyncManager) exportSyncData() *SyncData {
 	checksum := calculateChecksum(data)
 
 	return &SyncData{
-		Mirrors:       mirrors,
-		CurrentCodex:  sm.mirrorManager.config.CurrentCodex,
-		CurrentClaude: sm.mirrorManager.config.CurrentClaude,
-		Timestamp:     time.Now(),
-		DeviceID:      sm.config.DeviceID,
-		Version:       "3.0", // 新版本，总是包含加密的API密钥
-		Checksum:      checksum,
-		HasAPIKeys:    true, // 总是为true
+		Mirrors:        mirrors,
+		CurrentCodex:   sm.mirrorManager.config.CurrentCodex,
+		CurrentClaude:  sm.mirrorManager.config.CurrentClaude,
+		Timestamp:      time.Now(),
+		DeviceID:       sm.config.DeviceID,
+		Version:        "3.1", // 支持删除追踪的新版本
+		Checksum:       checksum,
+		HasAPIKeys:     true,           // 总是为true
+		DeletedMirrors: deletedMirrors, // 包含已删除的镜像源信息
 	}
 }
 
@@ -550,8 +568,9 @@ func (sm *SyncManager) applySyncData(syncData *SyncData) error {
 
 	// 应用新的镜像源配置
 	var newMirrors []MirrorConfig
-	for _, mirror := range syncData.Mirrors {
-		newMirror := mirror
+	for i := range syncData.Mirrors {
+		mirror := &syncData.Mirrors[i]
+		newMirror := *mirror
 
 		// 解密API密钥
 		if mirror.APIKey != "" {
@@ -839,31 +858,36 @@ func (sm *SyncManager) showConfigChanges(currentConfig, newConfig *SystemConfig)
 
 	// 创建映射便于比较
 	currentMirrors := make(map[string]MirrorConfig)
-	for _, mirror := range currentConfig.Mirrors {
-		currentMirrors[mirror.Name] = mirror
+	for i := range currentConfig.Mirrors {
+		mirror := &currentConfig.Mirrors[i]
+		currentMirrors[mirror.Name] = *mirror
 	}
 
 	newMirrors := make(map[string]MirrorConfig)
-	for _, mirror := range newConfig.Mirrors {
-		newMirrors[mirror.Name] = mirror
+	for i := range newConfig.Mirrors {
+		mirror := &newConfig.Mirrors[i]
+		newMirrors[mirror.Name] = *mirror
 	}
 
 	// 检查新增的镜像源
-	for name, newMirror := range newMirrors {
+	for name := range newMirrors {
+		newMirror := newMirrors[name]
 		if _, exists := currentMirrors[name]; !exists {
 			fmt.Printf("     + 新增: %s (%s)\n", name, newMirror.BaseURL)
 		}
 	}
 
 	// 检查删除的镜像源
-	for name, currentMirror := range currentMirrors {
+	for name := range currentMirrors {
+		currentMirror := currentMirrors[name]
 		if _, exists := newMirrors[name]; !exists {
 			fmt.Printf("     - 删除: %s (%s)\n", name, currentMirror.BaseURL)
 		}
 	}
 
 	// 检查修改的镜像源
-	for name, newMirror := range newMirrors {
+	for name := range newMirrors {
+		newMirror := newMirrors[name]
 		if currentMirror, exists := currentMirrors[name]; exists {
 			if currentMirror.BaseURL != newMirror.BaseURL {
 				fmt.Printf("     ~ 修改: %s (%s -> %s)\n", name, currentMirror.BaseURL, newMirror.BaseURL)

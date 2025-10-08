@@ -12,12 +12,16 @@ const (
 
 // MirrorConfig 镜像源配置结构.
 type MirrorConfig struct {
-	Name      string   `json:"name" toml:"name"`                                 // 镜像源名称
-	BaseURL   string   `json:"base_url" toml:"base_url"`                         // API基础URL.
-	APIKey    string   `json:"api_key" toml:"api_key"`                           // API密钥.
-	EnvKey    string   `json:"env_key" toml:"env_key"`                           // 环境变量key
-	ToolType  ToolType `json:"tool_type" toml:"tool_type"`                       // 工具类型
-	ModelName string   `json:"model_name,omitempty" toml:"model_name,omitempty"` // 模型名称 (可选，主要用于Claude)
+	Name         string    `json:"name" toml:"name"`                                       // 镜像源名称
+	BaseURL      string    `json:"base_url" toml:"base_url"`                               // API基础URL.
+	APIKey       string    `json:"api_key" toml:"api_key"`                                 // API密钥.
+	EnvKey       string    `json:"env_key" toml:"env_key"`                                 // 环境变量key
+	ToolType     ToolType  `json:"tool_type" toml:"tool_type"`                             // 工具类型
+	ModelName    string    `json:"model_name,omitempty" toml:"model_name,omitempty"`       // 模型名称 (可选，主要用于Claude)
+	CreatedAt    time.Time `json:"created_at,omitempty" toml:"created_at,omitempty"`       // 创建时间
+	LastModified time.Time `json:"last_modified,omitempty" toml:"last_modified,omitempty"` // 最后修改时间
+	Deleted      bool      `json:"deleted,omitempty" toml:"deleted,omitempty"`             // 删除标记
+	DeletedAt    time.Time `json:"deleted_at,omitempty" toml:"deleted_at,omitempty"`       // 删除时间
 }
 
 // SystemConfig 系统配置结构.
@@ -121,14 +125,15 @@ type SyncConfig struct {
 
 // SyncData 同步数据结构.
 type SyncData struct {
-	Mirrors       []MirrorConfig `json:"mirrors"`            // 镜像源配置（可能包含加密的API密钥）
-	CurrentCodex  string         `json:"current_codex"`      // 当前 Codex 镜像源
-	CurrentClaude string         `json:"current_claude"`     // 当前 Claude 镜像源
-	Timestamp     time.Time      `json:"timestamp"`          // 时间戳
-	DeviceID      string         `json:"device_id"`          // 设备ID
-	Version       string         `json:"version"`            // 配置版本
-	Checksum      string         `json:"checksum,omitempty"` // 数据校验和
-	HasAPIKeys    bool           `json:"has_api_keys"`       // 是否包含API密钥
+	Mirrors        []MirrorConfig `json:"mirrors"`                   // 镜像源配置（可能包含加密的API密钥）
+	CurrentCodex   string         `json:"current_codex"`             // 当前 Codex 镜像源
+	CurrentClaude  string         `json:"current_claude"`            // 当前 Claude 镜像源
+	Timestamp      time.Time      `json:"timestamp"`                 // 时间戳
+	DeviceID       string         `json:"device_id"`                 // 设备ID
+	Version        string         `json:"version"`                   // 配置版本
+	Checksum       string         `json:"checksum,omitempty"`        // 数据校验和
+	HasAPIKeys     bool           `json:"has_api_keys"`              // 是否包含API密钥
+	DeletedMirrors []MirrorConfig `json:"deleted_mirrors,omitempty"` // 已删除的镜像源（用于追踪删除操作）
 }
 
 // SecureMirrorConfig 安全的镜像源配置（不包含API密钥）.

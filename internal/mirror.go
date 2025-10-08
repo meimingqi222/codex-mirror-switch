@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -124,19 +125,25 @@ func (mm *MirrorManager) AddMirrorWithType(name, baseURL, apiKey string, toolTyp
 // AddMirrorWithModel 添加指定类型和模型名称的镜像源.
 func (mm *MirrorManager) AddMirrorWithModel(name, baseURL, apiKey string, toolType ToolType, modelName string) error {
 	// 检查镜像源是否已存在
-	for _, mirror := range mm.config.Mirrors {
+	for i := range mm.config.Mirrors {
+		mirror := &mm.config.Mirrors[i]
 		if mirror.Name == name {
 			return fmt.Errorf("镜像源 '%s' 已存在", name)
 		}
 	}
 
+	now := time.Now()
+
 	// 添加新镜像源
 	newMirror := MirrorConfig{
-		Name:      name,
-		BaseURL:   baseURL,
-		APIKey:    apiKey,
-		ToolType:  toolType,
-		ModelName: modelName,
+		Name:         name,
+		BaseURL:      baseURL,
+		APIKey:       apiKey,
+		ToolType:     toolType,
+		ModelName:    modelName,
+		CreatedAt:    now,
+		LastModified: now,
+		Deleted:      false,
 	}
 
 	// 根据工具类型设置环境变量key
@@ -161,11 +168,19 @@ func (mm *MirrorManager) AddMirrorWithModel(name, baseURL, apiKey string, toolTy
 
 // RemoveMirror 删除镜像源.
 func (mm *MirrorManager) RemoveMirror(name string) error {
+	return mm.RemoveMirrorWithOptions(name, false)
+}
+
+// RemoveMirrorWithOptions 删除镜像源（带选项）.
+func (mm *MirrorManager) RemoveMirrorWithOptions(name string, permanent bool) error {
 	if name == DefaultMirrorName {
 		return fmt.Errorf("不能删除官方镜像源")
 	}
 
-	for i, mirror := range mm.config.Mirrors {
+	now := time.Now()
+
+	for i := range mm.config.Mirrors {
+		mirror := &mm.config.Mirrors[i]
 		if mirror.Name != name {
 			continue
 		}
@@ -181,8 +196,16 @@ func (mm *MirrorManager) RemoveMirror(name string) error {
 			mm.config.CurrentClaude = ""
 		}
 
-		// 删除镜像源
-		mm.config.Mirrors = append(mm.config.Mirrors[:i], mm.config.Mirrors[i+1:]...)
+		if permanent {
+			// 永久删除，直接移除
+			mm.config.Mirrors = append(mm.config.Mirrors[:i], mm.config.Mirrors[i+1:]...)
+		} else {
+			// 软删除，标记为已删除但保留信息用于同步
+			mirror.Deleted = true
+			mirror.DeletedAt = now
+			mirror.LastModified = now
+		}
+
 		return mm.saveConfig()
 	}
 
@@ -191,14 +214,53 @@ func (mm *MirrorManager) RemoveMirror(name string) error {
 
 // ListMirrors 列出所有镜像源.
 func (mm *MirrorManager) ListMirrors() []MirrorConfig {
-	return mm.config.Mirrors
+	return mm.ListActiveMirrors()
+}
+
+// ListActiveMirrors 列出活跃的镜像源（不包括已删除的）.
+func (mm *MirrorManager) ListActiveMirrors() []MirrorConfig {
+	var activeMirrors []MirrorConfig
+	for i := range mm.config.Mirrors {
+		mirror := &mm.config.Mirrors[i]
+		if !mirror.Deleted {
+			activeMirrors = append(activeMirrors, *mirror)
+		}
+	}
+	return activeMirrors
+}
+
+// ListDeletedMirrors 列出已删除的镜像源.
+func (mm *MirrorManager) ListDeletedMirrors() []MirrorConfig {
+	var deletedMirrors []MirrorConfig
+	for i := range mm.config.Mirrors {
+		mirror := &mm.config.Mirrors[i]
+		if mirror.Deleted {
+			deletedMirrors = append(deletedMirrors, *mirror)
+		}
+	}
+	return deletedMirrors
+}
+
+// PurgeDeletedMirrors 永久清除所有已删除的镜像源.
+func (mm *MirrorManager) PurgeDeletedMirrors() error {
+	var activeMirrors []MirrorConfig
+	for i := range mm.config.Mirrors {
+		mirror := &mm.config.Mirrors[i]
+		if !mirror.Deleted {
+			activeMirrors = append(activeMirrors, *mirror)
+		}
+	}
+
+	mm.config.Mirrors = activeMirrors
+	return mm.saveConfig()
 }
 
 // GetCurrentMirror 获取当前镜像源.
 func (mm *MirrorManager) GetCurrentMirror() (*MirrorConfig, error) {
-	for _, mirror := range mm.config.Mirrors {
+	for i := range mm.config.Mirrors {
+		mirror := &mm.config.Mirrors[i]
 		if mirror.Name == mm.config.CurrentMirror {
-			return &mirror, nil
+			return mirror, nil
 		}
 	}
 	return nil, fmt.Errorf("当前镜像源 '%s' 不存在", mm.config.CurrentMirror)
@@ -206,9 +268,10 @@ func (mm *MirrorManager) GetCurrentMirror() (*MirrorConfig, error) {
 
 // GetCurrentCodexMirror 获取当前激活的 Codex 镜像源.
 func (mm *MirrorManager) GetCurrentCodexMirror() (*MirrorConfig, error) {
-	for _, mirror := range mm.config.Mirrors {
+	for i := range mm.config.Mirrors {
+		mirror := &mm.config.Mirrors[i]
 		if mirror.Name == mm.config.CurrentCodex && mirror.ToolType == ToolTypeCodex {
-			return &mirror, nil
+			return mirror, nil
 		}
 	}
 	return nil, fmt.Errorf("当前 Codex 镜像源 '%s' 不存在", mm.config.CurrentCodex)
@@ -216,9 +279,10 @@ func (mm *MirrorManager) GetCurrentCodexMirror() (*MirrorConfig, error) {
 
 // GetCurrentClaudeMirror 获取当前激活的 Claude 镜像源.
 func (mm *MirrorManager) GetCurrentClaudeMirror() (*MirrorConfig, error) {
-	for _, mirror := range mm.config.Mirrors {
+	for i := range mm.config.Mirrors {
+		mirror := &mm.config.Mirrors[i]
 		if mirror.Name == mm.config.CurrentClaude && mirror.ToolType == ToolTypeClaude {
-			return &mirror, nil
+			return mirror, nil
 		}
 	}
 	return nil, fmt.Errorf("当前 Claude 镜像源 '%s' 不存在", mm.config.CurrentClaude)
@@ -226,9 +290,10 @@ func (mm *MirrorManager) GetCurrentClaudeMirror() (*MirrorConfig, error) {
 
 // GetMirrorByName 根据名称获取镜像源配置.
 func (mm *MirrorManager) GetMirrorByName(name string) (*MirrorConfig, error) {
-	for _, mirror := range mm.config.Mirrors {
+	for i := range mm.config.Mirrors {
+		mirror := &mm.config.Mirrors[i]
 		if mirror.Name == name {
-			return &mirror, nil
+			return mirror, nil
 		}
 	}
 	return nil, fmt.Errorf("镜像源 '%s' 不存在", name)
@@ -237,7 +302,8 @@ func (mm *MirrorManager) GetMirrorByName(name string) (*MirrorConfig, error) {
 // SwitchMirror 切换镜像源.
 func (mm *MirrorManager) SwitchMirror(name string) error {
 	// 检查镜像源是否存在
-	for _, mirror := range mm.config.Mirrors {
+	for i := range mm.config.Mirrors {
+		mirror := &mm.config.Mirrors[i]
 		if mirror.Name == name {
 			mm.config.CurrentMirror = name
 
@@ -258,13 +324,14 @@ func (mm *MirrorManager) SwitchMirror(name string) error {
 
 // UpdateMirror 更新镜像源.
 func (mm *MirrorManager) UpdateMirror(name, baseURL, apiKey string) error {
-	for i, mirror := range mm.config.Mirrors {
+	for i := range mm.config.Mirrors {
+		mirror := &mm.config.Mirrors[i]
 		if mirror.Name == name {
 			if baseURL != "" {
-				mm.config.Mirrors[i].BaseURL = baseURL
+				mirror.BaseURL = baseURL
 			}
 			if apiKey != "" {
-				mm.config.Mirrors[i].APIKey = apiKey
+				mirror.APIKey = apiKey
 			}
 			return mm.saveConfig()
 		}
@@ -278,7 +345,8 @@ func (mm *MirrorManager) FixEnvKeyFormat() error {
 	updated := false
 
 	// 检查并修复每个镜像源的env_key格式
-	for i, mirror := range mm.config.Mirrors {
+	for i := range mm.config.Mirrors {
+		mirror := &mm.config.Mirrors[i]
 		var expectedEnvKey string
 		switch mirror.ToolType {
 		case ToolTypeCodex:
@@ -292,7 +360,7 @@ func (mm *MirrorManager) FixEnvKeyFormat() error {
 		// 如果env_key为空或者格式不正确，都需要修复
 		if mirror.EnvKey == "" || mirror.EnvKey != expectedEnvKey {
 			fmt.Printf("修复镜像源 '%s' 的env_key: '%s' -> '%s'\n", mirror.Name, mirror.EnvKey, expectedEnvKey)
-			mm.config.Mirrors[i].EnvKey = expectedEnvKey
+			mirror.EnvKey = expectedEnvKey
 			updated = true
 		}
 	}
@@ -323,10 +391,12 @@ func (mm *MirrorManager) discoverFromEnvironment() {
 	mm.discoverCodexFromEnv(discoveredMirrors)
 
 	// 将发现的镜像源添加到配置中
-	for name, mirror := range discoveredMirrors {
+	for name := range discoveredMirrors {
+		mirror := discoveredMirrors[name]
 		// 检查是否已经存在于默认配置中
 		exists := false
-		for _, existingMirror := range mm.config.Mirrors {
+		for i := range mm.config.Mirrors {
+			existingMirror := &mm.config.Mirrors[i]
 			if existingMirror.Name == name {
 				exists = true
 				break
