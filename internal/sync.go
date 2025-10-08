@@ -382,6 +382,36 @@ func (sm *SyncManager) PullWithStrategy(strategy string) error {
 	return nil
 }
 
+// FetchRemoteSyncData 仅获取云端同步数据（不应用到本地）。
+func (sm *SyncManager) FetchRemoteSyncData() (*SyncData, error) {
+	// 确保提供商已初始化
+	if err := sm.LoadSync(); err != nil {
+		return nil, err
+	}
+
+	filename := ConfigFileName
+
+	// 下载远端数据
+	encryptedData, err := sm.provider.Download(filename)
+	if err != nil {
+		return nil, fmt.Errorf("下载配置失败: %w", err)
+	}
+
+	// 解密
+	data, err := sm.decryptData(encryptedData)
+	if err != nil {
+		return nil, fmt.Errorf("解密数据失败: %w", err)
+	}
+
+	// 解析 JSON
+	var syncData SyncData
+	if err := json.Unmarshal(data, &syncData); err != nil {
+		return nil, fmt.Errorf("解析同步数据失败: %w", err)
+	}
+
+	return &syncData, nil
+}
+
 // handleConflicts 处理配置冲突.
 func (sm *SyncManager) handleConflicts(resolver *ConflictResolver, conflicts *ConflictResolution, strategy string, syncData *SyncData) error {
 	fmt.Printf("⚠️  检测到配置冲突\n\n")
