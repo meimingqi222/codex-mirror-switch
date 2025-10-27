@@ -544,58 +544,37 @@ func (cr *ConflictResolver) finalizeMergeConfig(config *SystemConfig, mergedMirr
 
 // selectCurrentMirrors 选择当前激活的镜像源.
 func (cr *ConflictResolver) selectCurrentMirrors(config *SystemConfig, mergedMirrors map[string]MirrorConfig) {
-	// 对于 Codex 镜像源
-	if cr.localConfig.CurrentCodex != "" {
-		// 优先保留本地的激活源
-		if _, exists := mergedMirrors[cr.localConfig.CurrentCodex]; exists {
-			config.CurrentCodex = cr.localConfig.CurrentCodex
-		} else if cr.remoteData.CurrentCodex != "" {
-			// 如果本地激活源不存在，尝试使用云端的激活源
-			if _, exists := mergedMirrors[cr.remoteData.CurrentCodex]; exists {
-				config.CurrentCodex = cr.remoteData.CurrentCodex
-			} else {
-				config.CurrentCodex = cr.selectDefaultMirror(mergedMirrors, ToolTypeCodex)
-			}
-		} else {
-			config.CurrentCodex = cr.selectDefaultMirror(mergedMirrors, ToolTypeCodex)
-		}
-	} else if cr.remoteData.CurrentCodex != "" {
-		// 如果本地没有激活源，使用云端的激活源
-		if _, exists := mergedMirrors[cr.remoteData.CurrentCodex]; exists {
-			config.CurrentCodex = cr.remoteData.CurrentCodex
-		} else {
-			config.CurrentCodex = cr.selectDefaultMirror(mergedMirrors, ToolTypeCodex)
-		}
-	} else {
-		// 都没有的话选择默认的
-		config.CurrentCodex = cr.selectDefaultMirror(mergedMirrors, ToolTypeCodex)
-	}
+	// 选择当前激活的镜像源（通用逻辑）
+	config.CurrentCodex = cr.selectCurrentMirror(mergedMirrors, cr.localConfig.CurrentCodex, cr.remoteData.CurrentCodex, ToolTypeCodex)
+	config.CurrentClaude = cr.selectCurrentMirror(mergedMirrors, cr.localConfig.CurrentClaude, cr.remoteData.CurrentClaude, ToolTypeClaude)
+}
 
-	// 对于 Claude 镜像源
-	if cr.localConfig.CurrentClaude != "" {
+// selectCurrentMirror 选择当前激活的镜像源（通用逻辑）.
+func (cr *ConflictResolver) selectCurrentMirror(mergedMirrors map[string]MirrorConfig, localCurrent, remoteCurrent string, toolType ToolType) string {
+	if localCurrent != "" {
 		// 优先保留本地的激活源
-		if _, exists := mergedMirrors[cr.localConfig.CurrentClaude]; exists {
-			config.CurrentClaude = cr.localConfig.CurrentClaude
-		} else if cr.remoteData.CurrentClaude != "" {
+		if _, exists := mergedMirrors[localCurrent]; exists {
+			return localCurrent
+		} else if remoteCurrent != "" {
 			// 如果本地激活源不存在，尝试使用云端的激活源
-			if _, exists := mergedMirrors[cr.remoteData.CurrentClaude]; exists {
-				config.CurrentClaude = cr.remoteData.CurrentClaude
+			if _, exists := mergedMirrors[remoteCurrent]; exists {
+				return remoteCurrent
 			} else {
-				config.CurrentClaude = cr.selectDefaultMirror(mergedMirrors, ToolTypeClaude)
+				return cr.selectDefaultMirror(mergedMirrors, toolType)
 			}
 		} else {
-			config.CurrentClaude = cr.selectDefaultMirror(mergedMirrors, ToolTypeClaude)
+			return cr.selectDefaultMirror(mergedMirrors, toolType)
 		}
-	} else if cr.remoteData.CurrentClaude != "" {
+	} else if remoteCurrent != "" {
 		// 如果本地没有激活源，使用云端的激活源
-		if _, exists := mergedMirrors[cr.remoteData.CurrentClaude]; exists {
-			config.CurrentClaude = cr.remoteData.CurrentClaude
+		if _, exists := mergedMirrors[remoteCurrent]; exists {
+			return remoteCurrent
 		} else {
-			config.CurrentClaude = cr.selectDefaultMirror(mergedMirrors, ToolTypeClaude)
+			return cr.selectDefaultMirror(mergedMirrors, toolType)
 		}
 	} else {
 		// 都没有的话选择默认的
-		config.CurrentClaude = cr.selectDefaultMirror(mergedMirrors, ToolTypeClaude)
+		return cr.selectDefaultMirror(mergedMirrors, toolType)
 	}
 }
 

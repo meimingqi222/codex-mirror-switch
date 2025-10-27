@@ -507,7 +507,7 @@ func TestCommandIntegration(t *testing.T) {
 		}
 
 		// 2. 添加第二个镜像源
-		stdout, stderr, err = executeCommand(rootCmd, "add", "integration2", "https://api.int2.com", "sk-int2", "--type", "claude")
+		_, stderr, err = executeCommand(rootCmd, "add", "integration2", "https://api.int2.com", "sk-int2", "--type", "claude")
 		if err != nil {
 			t.Fatalf("Failed to add second mirror: %v, stderr: %s", err, stderr)
 		}
@@ -522,19 +522,19 @@ func TestCommandIntegration(t *testing.T) {
 		}
 
 		// 4. 切换镜像源
-		stdout, stderr, err = executeCommand(rootCmd, "switch", "integration1")
+		_, stderr, err = executeCommand(rootCmd, "switch", "integration1")
 		if err != nil {
 			t.Fatalf("Failed to switch mirror: %v, stderr: %s", err, stderr)
 		}
 
 		// 5. 查看状态
-		stdout, stderr, err = executeCommand(rootCmd, "status")
+		_, stderr, err = executeCommand(rootCmd, "status")
 		if err != nil {
 			t.Fatalf("Failed to get status: %v, stderr: %s", err, stderr)
 		}
 
 		// 6. 删除一个镜像源
-		stdout, stderr, err = executeCommand(rootCmd, "remove", "integration2")
+		_, stderr, err = executeCommand(rootCmd, "remove", "integration2")
 		if err != nil {
 			t.Fatalf("Failed to remove mirror: %v, stderr: %s", err, stderr)
 		}

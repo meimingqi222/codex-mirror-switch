@@ -151,7 +151,7 @@ func (mm *MirrorManager) AddMirrorWithModel(name, baseURL, apiKey string, toolTy
 	case ToolTypeCodex:
 		newMirror.EnvKey = CodexSwitchAPIKeyEnv // Codex 固定使用专用的环境变量名
 	case ToolTypeClaude:
-		newMirror.EnvKey = "ANTHROPIC_AUTH_TOKEN" // Claude 使用固定的环境变量名
+		newMirror.EnvKey = AnthropicAuthTokenEnv // Claude 使用固定的环境变量名
 	}
 
 	mm.config.Mirrors = append(mm.config.Mirrors, newMirror)
@@ -352,7 +352,7 @@ func (mm *MirrorManager) FixEnvKeyFormat() error {
 		case ToolTypeCodex:
 			expectedEnvKey = CodexSwitchAPIKeyEnv // Codex 固定使用专用的环境变量名
 		case ToolTypeClaude:
-			expectedEnvKey = "ANTHROPIC_AUTH_TOKEN"
+			expectedEnvKey = AnthropicAuthTokenEnv
 		default:
 			continue // 跳过未知类型
 		}
@@ -608,9 +608,9 @@ func SanitizeEnvVarName(name string) string {
 		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
 			return r
 		case r == '-' || r == ' ':
-			return '_'  // 将连字符和空格替换为下划线
+			return '_' // 将连字符和空格替换为下划线
 		case r == '_':
-			return '_'  // 保留原有下划线
+			return '_' // 保留原有下划线
 		default:
 			return -1 // 删除其他字符
 		}

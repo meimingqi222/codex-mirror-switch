@@ -196,13 +196,12 @@ func TestEnsureDirPermissions(t *testing.T) {
 		t.Fatalf("EnsureDir() error = %v", err)
 	}
 
-	// 检查目录权限 (0755)
 	info, err := os.Stat(testDir)
 	if err != nil {
 		t.Fatalf("stat error = %v", err)
 	}
 
-	expectedPerm := os.FileMode(0755)
+	expectedPerm := os.FileMode(0o755)
 	if info.Mode().Perm() != expectedPerm {
 		t.Errorf("Directory permission = %o, expected %o", info.Mode().Perm(), expectedPerm)
 	}
@@ -372,7 +371,7 @@ func TestEnvironmentConstants(t *testing.T) {
 // Helper functions for testing
 
 // setTempHome 设置临时home目录并返回原始值.
-func setTempHome(t *testing.T, tempDir string) map[string]string {
+func setTempHome(_ *testing.T, tempDir string) map[string]string {
 	oldValues := make(map[string]string)
 
 	// 保存原始值

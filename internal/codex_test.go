@@ -48,8 +48,8 @@ func TestUpdateConfig(t *testing.T) {
 	ccm := createTestCodexConfigManager(t, tempDir)
 
 	testMirror := &MirrorConfig{
-		Name:     "test-provider",
-		BaseURL:  "https://api.test.com",
+		Name:     TestProviderName,
+		BaseURL:  TestAPIURL,
 		APIKey:   "test-api-key",
 		EnvKey:   CodexSwitchAPIKeyEnv,
 		ToolType: ToolTypeCodex,
@@ -73,15 +73,15 @@ func TestUpdateConfig(t *testing.T) {
 	}
 
 	// 验证基本配置
-	if config.ModelProvider != "test-provider" {
+	if config.ModelProvider != TestProviderName {
 		t.Errorf("ModelProvider = %v, expected test-provider", config.ModelProvider)
 	}
 
-	if config.Model != "gpt-5" {
+	if config.Model != TestModelGPT5 {
 		t.Errorf("Model = %v, expected gpt-5", config.Model)
 	}
 
-	if config.ModelReasoningEffort != "high" {
+	if config.ModelReasoningEffort != TestHighEffort {
 		t.Errorf("ModelReasoningEffort = %v, expected high", config.ModelReasoningEffort)
 	}
 
@@ -94,24 +94,24 @@ func TestUpdateConfig(t *testing.T) {
 		t.Fatal("ModelProviders should not be nil")
 	}
 
-	provider, exists := config.ModelProviders["test-provider"]
+	provider, exists := config.ModelProviders[TestProviderName]
 	if !exists {
 		t.Fatal("test-provider should exist in ModelProviders")
 	}
 
-	if provider.Name != "test-provider" {
+	if provider.Name != TestProviderName {
 		t.Errorf("Provider Name = %v, expected test-provider", provider.Name)
 	}
 
 	if provider.BaseURL != "https://api.test.com" {
-		t.Errorf("Provider BaseURL = %v, expected https://api.test.com", provider.BaseURL)
+		t.Errorf("Provider BaseURL = %v, expected %s", provider.BaseURL, TestAPIURL)
 	}
 
 	if provider.EnvKey != CodexSwitchAPIKeyEnv {
 		t.Errorf("Provider EnvKey = %v, expected %v", provider.EnvKey, CodexSwitchAPIKeyEnv)
 	}
 
-	if provider.WireAPI != "responses" {
+	if provider.WireAPI != TestResponsesDir {
 		t.Errorf("Provider WireAPI = %v, expected responses", provider.WireAPI)
 	}
 }
@@ -124,7 +124,7 @@ func TestUpdateConfigExisting(t *testing.T) {
 	// 创建初始配置文件
 	initialConfig := CodexConfig{
 		ModelProvider:          "initial-provider",
-		Model:                  "gpt-4",
+		Model:                  TestModelGPT4,
 		ModelReasoningEffort:   "medium",
 		DisableResponseStorage: false,
 		ModelProviders: map[string]ModelProviderConfig{
@@ -185,7 +185,7 @@ func TestUpdateConfigExisting(t *testing.T) {
 	}
 
 	// 验证默认值被设置
-	if updatedConfig.Model != "gpt-5" {
+	if updatedConfig.Model != TestModelGPT5 {
 		t.Errorf("Model should be updated to gpt-5, got %v", updatedConfig.Model)
 	}
 
@@ -200,8 +200,8 @@ func TestUpdateAuth(t *testing.T) {
 	ccm := createTestCodexConfigManager(t, tempDir)
 
 	testMirror := &MirrorConfig{
-		Name:     "test-provider",
-		BaseURL:  "https://api.test.com",
+		Name:     TestProviderName,
+		BaseURL:  TestAPIURL,
 		APIKey:   "test-api-key-12345",
 		ToolType: ToolTypeCodex,
 	}
@@ -247,15 +247,15 @@ func TestGetCurrentConfig(t *testing.T) {
 
 	// 创建测试配置文件
 	testConfig := CodexConfig{
-		ModelProvider:          "test-provider",
-		Model:                  "gpt-4",
-		ModelReasoningEffort:   "high",
+		ModelProvider:          TestProviderName,
+		Model:                  TestModelGPT4,
+		ModelReasoningEffort:   TestHighEffort,
 		DisableResponseStorage: true,
 		ModelProviders: map[string]ModelProviderConfig{
-			"test-provider": {
-				Name:    "test-provider",
-				BaseURL: "https://api.test.com",
-				WireAPI: "responses",
+			TestProviderName: {
+				Name:    TestProviderName,
+				BaseURL: TestAPIURL,
+				WireAPI: TestResponsesDir,
 				EnvKey:  CodexSwitchAPIKeyEnv,
 			},
 		},
@@ -272,11 +272,11 @@ func TestGetCurrentConfig(t *testing.T) {
 		t.Fatalf("GetCurrentConfig() error = %v", err)
 	}
 
-	if config.ModelProvider != "test-provider" {
+	if config.ModelProvider != TestProviderName {
 		t.Errorf("ModelProvider = %v, expected test-provider", config.ModelProvider)
 	}
 
-	if config.Model != "gpt-4" {
+	if config.Model != TestModelGPT4 {
 		t.Errorf("Model = %v, expected gpt-4", config.Model)
 	}
 }
@@ -328,18 +328,18 @@ func TestGetCurrentBaseURL(t *testing.T) {
 
 	// 创建测试配置
 	testConfig := CodexConfig{
-		ModelProvider: "test-provider",
+		ModelProvider: TestProviderName,
 		ModelProviders: map[string]ModelProviderConfig{
-			"test-provider": {
-				Name:    "test-provider",
-				BaseURL: "https://api.test.com",
-				WireAPI: "responses",
+			TestProviderName: {
+				Name:    TestProviderName,
+				BaseURL: TestAPIURL,
+				WireAPI: TestResponsesDir,
 				EnvKey:  CodexSwitchAPIKeyEnv,
 			},
 			"other-provider": {
 				Name:    "other-provider",
 				BaseURL: "https://api.other.com",
-				WireAPI: "responses",
+				WireAPI: TestResponsesDir,
 				EnvKey:  CodexSwitchAPIKeyEnv,
 			},
 		},
@@ -358,8 +358,8 @@ func TestGetCurrentBaseURL(t *testing.T) {
 	}{
 		{
 			name:         "存在的提供商",
-			providerName: "test-provider",
-			expectedURL:  "https://api.test.com",
+			providerName: TestProviderName,
+			expectedURL:  TestAPIURL,
 			expectError:  false,
 		},
 		{
@@ -448,24 +448,24 @@ func TestFixEnvKeyFormat(t *testing.T) {
 
 	// 创建有错误env_key格式的配置
 	testConfig := CodexConfig{
-		ModelProvider: "test-provider",
+		ModelProvider: TestProviderName,
 		ModelProviders: map[string]ModelProviderConfig{
 			"provider1": {
 				Name:    "provider1",
 				BaseURL: "https://api.test1.com",
-				WireAPI: "responses",
+				WireAPI: TestResponsesDir,
 				EnvKey:  "WRONG_ENV_KEY", // 错误的格式
 			},
 			"provider2": {
 				Name:    "provider2",
 				BaseURL: "https://api.test2.com",
-				WireAPI: "responses",
+				WireAPI: TestResponsesDir,
 				EnvKey:  CodexSwitchAPIKeyEnv, // 正确的格式
 			},
 			"provider3": {
 				Name:    "provider3",
 				BaseURL: "https://api.test3.com",
-				WireAPI: "responses",
+				WireAPI: TestResponsesDir,
 				EnvKey:  "", // 空的env_key
 			},
 		},
@@ -504,7 +504,7 @@ func TestBackupConfig(t *testing.T) {
 	// 创建测试配置和认证文件
 	testConfig := CodexConfig{
 		ModelProvider: "backup-test",
-		Model:         "gpt-4",
+		Model:         TestModelGPT4,
 	}
 
 	err := ccm.saveConfig(&testConfig)
@@ -561,7 +561,7 @@ func TestCopyFile(t *testing.T) {
 	// 创建源文件
 	srcPath := filepath.Join(tempDir, "source.txt")
 	srcContent := "This is test content for copy file test"
-	err := os.WriteFile(srcPath, []byte(srcContent), 0644)
+	err := os.WriteFile(srcPath, []byte(srcContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create source file: %v", err)
 	}
@@ -628,15 +628,15 @@ func createTestCodexConfigManager(t *testing.T, tempDir string) *CodexConfigMana
 func TestCodexConfigStructures(t *testing.T) {
 	// 测试CodexConfig结构体
 	config := CodexConfig{
-		ModelProvider:          "test-provider",
-		Model:                  "gpt-4",
-		ModelReasoningEffort:   "high",
+		ModelProvider:          TestProviderName,
+		Model:                  TestModelGPT4,
+		ModelReasoningEffort:   TestHighEffort,
 		DisableResponseStorage: true,
 		ModelProviders: map[string]ModelProviderConfig{
 			"provider1": {
 				Name:    "provider1",
-				BaseURL: "https://api.test.com",
-				WireAPI: "responses",
+				BaseURL: TestAPIURL,
+				WireAPI: TestResponsesDir,
 				EnvKey:  CodexSwitchAPIKeyEnv,
 			},
 		},

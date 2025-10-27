@@ -63,7 +63,7 @@ func TestAddMirror(t *testing.T) {
 		{
 			name:        "添加有效镜像源",
 			mirrorName:  "test-mirror",
-			baseURL:     "https://api.test.com",
+			baseURL:     TestAPIURL,
 			apiKey:      "test-api-key",
 			expectError: false,
 		},
@@ -91,7 +91,7 @@ func TestAddMirror(t *testing.T) {
 	for _, mirror := range mirrors {
 		if mirror.Name == "test-mirror" {
 			found = true
-			if mirror.BaseURL != "https://api.test.com" {
+			if mirror.BaseURL != TestAPIURL {
 				t.Errorf("期望 BaseURL 为 'https://api.test.com', 实际为 %s", mirror.BaseURL)
 			}
 			if mirror.APIKey != "test-api-key" {
@@ -172,7 +172,7 @@ func TestRemoveMirror(t *testing.T) {
 	mm := createTestMirrorManager(t, tempDir)
 
 	// 先添加一个测试镜像源
-	err := mm.AddMirror("test-remove", "https://api.test.com", "test-key")
+	err := mm.AddMirror("test-remove", TestAPIURL, "test-key")
 	if err != nil {
 		t.Fatalf("添加测试镜像源失败: %v", err)
 	}
@@ -223,7 +223,7 @@ func TestSwitchMirror(t *testing.T) {
 	mm := createTestMirrorManager(t, tempDir)
 
 	// 添加测试镜像源
-	err := mm.AddMirror("test-switch", "https://api.test.com", "test-key")
+	err := mm.AddMirror("test-switch", TestAPIURL, "test-key")
 	if err != nil {
 		t.Fatalf("添加测试镜像源失败: %v", err)
 	}
@@ -277,7 +277,7 @@ func TestGetCurrentMirror(t *testing.T) {
 	}
 
 	// 添加并切换到新镜像源
-	err = mm.AddMirror("test-current", "https://api.test.com", "test-key")
+	err = mm.AddMirror("test-current", TestAPIURL, "test-key")
 	if err != nil {
 		t.Fatalf("添加测试镜像源失败: %v", err)
 	}
@@ -302,7 +302,7 @@ func TestUpdateMirror(t *testing.T) {
 	mm := createTestMirrorManager(t, tempDir)
 
 	// 添加测试镜像源
-	err := mm.AddMirror("test-update", "https://api.test.com", "old-key")
+	err := mm.AddMirror("test-update", TestAPIURL, "old-key")
 	if err != nil {
 		t.Fatalf("添加测试镜像源失败: %v", err)
 	}
@@ -324,7 +324,7 @@ func TestUpdateMirror(t *testing.T) {
 		{
 			name:        "更新不存在的镜像源",
 			mirrorName:  "nonexistent",
-			newBaseURL:  "https://api.test.com",
+			newBaseURL:  TestAPIURL,
 			newAPIKey:   "test-key",
 			expectError: true,
 		},
@@ -415,7 +415,7 @@ func TestMirrorFixEnvKeyFormat(t *testing.T) {
 	mm.config.Mirrors = []MirrorConfig{
 		{
 			Name:     "codex-test",
-			BaseURL:  "https://api.test.com",
+			BaseURL:  TestAPIURL,
 			APIKey:   "test-key",
 			EnvKey:   "", // 空env_key，需要修复
 			ToolType: ToolTypeCodex,
@@ -529,7 +529,7 @@ func TestSystemConfigPersistence(t *testing.T) {
 
 	// 创建第一个管理器并添加配置
 	mm1 := createTestMirrorManager(t, tempDir)
-	err := mm1.AddMirror("persistence-test", "https://api.test.com", "test-key")
+	err := mm1.AddMirror("persistence-test", TestAPIURL, "test-key")
 	if err != nil {
 		t.Fatalf("添加测试镜像源失败: %v", err)
 	}
@@ -567,7 +567,7 @@ func TestSystemConfigPersistence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("配置持久化失败，找不到镜像源: %v", err)
 	}
-	if mirror.BaseURL != "https://api.test.com" {
+	if mirror.BaseURL != TestAPIURL {
 		t.Errorf("配置持久化失败，期望 BaseURL 为 'https://api.test.com'，实际为 %s", mirror.BaseURL)
 	}
 

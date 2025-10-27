@@ -188,12 +188,12 @@ func (ccm *CodexConfigManager) updateRawConfigBasicFields(rawConfig map[string]i
 	rawConfig["model_provider"] = mirrorName
 
 	// 更新 Model 字段 - 测试期望总是更新为 gpt-5
-	config.Model = "gpt-5"
+	config.Model = TestModelGPT5
 	rawConfig["model"] = config.Model
 
 	// 更新 ModelReasoningEffort 字段
 	if config.ModelReasoningEffort == "" {
-		config.ModelReasoningEffort = "high"
+		config.ModelReasoningEffort = TestHighEffort
 	}
 	rawConfig["model_reasoning_effort"] = config.ModelReasoningEffort
 

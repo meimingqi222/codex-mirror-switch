@@ -68,7 +68,7 @@ func TestLoadSettings(t *testing.T) {
 	testSettings := map[string]interface{}{
 		"editor.fontSize": 14,
 		"editor.tabSize":  4,
-		"chatgpt.apiBase": "https://api.test.com",
+		"chatgpt.apiBase": TestAPIURL,
 		"chatgpt.config": map[string]interface{}{
 			"model":                  "gpt-4",
 			"preferred_auth_method":  "apikey",
@@ -98,8 +98,8 @@ func TestLoadSettings(t *testing.T) {
 	}
 
 	// 验证ChatGPT设置
-	if apiBase, ok := loadedSettings["chatgpt.apiBase"]; !ok || apiBase != "https://api.test.com" {
-		t.Errorf("chatgpt.apiBase = %v, expected https://api.test.com", apiBase)
+	if apiBase, ok := loadedSettings["chatgpt.apiBase"]; !ok || apiBase != TestAPIURL {
+		t.Errorf("chatgpt.apiBase = %v, expected %s", apiBase, TestAPIURL)
 	}
 
 	// 验证嵌套配置
@@ -479,7 +479,7 @@ func TestLoadSettingsCorruptedFile(t *testing.T) {
 	vcm := createTestVSCodeConfigManager(t, tempDir)
 
 	// 创建损坏的JSON文件
-	err := os.WriteFile(vcm.settingsPath, []byte("{ invalid json content"), 0644)
+	err := os.WriteFile(vcm.settingsPath, []byte("{ invalid json content"), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create corrupted file: %v", err)
 	}

@@ -499,7 +499,7 @@ func TestSyncDataMarshalling(t *testing.T) {
 		Mirrors: []MirrorConfig{
 			{
 				Name:     "test-mirror",
-				BaseURL:  "https://api.test.com",
+				BaseURL:  TestAPIURL,
 				APIKey:   "test-key",
 				ToolType: ToolTypeCodex,
 			},
@@ -559,7 +559,7 @@ func TestCreateBackup(t *testing.T) {
 	// 添加一些测试数据
 	mm.config.Mirrors = append(mm.config.Mirrors, MirrorConfig{
 		Name:     "backup-test",
-		BaseURL:  "https://api.test.com",
+		BaseURL:  TestAPIURL,
 		APIKey:   "backup-key",
 		ToolType: ToolTypeCodex,
 	})
@@ -1003,7 +1003,7 @@ func TestProviderInfo(t *testing.T) {
 	info := ProviderInfo{
 		Name:        "test-provider",
 		Type:        "test",
-		Endpoint:    "https://api.test.com",
+		Endpoint:    TestAPIURL,
 		MaxFileSize: 1024,
 		Description: "Test provider",
 	}
