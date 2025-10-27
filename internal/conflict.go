@@ -465,8 +465,8 @@ func (cr *ConflictResolver) hasDeleteConflict(mirrorName string, resolution *Con
 
 // mergeExistingMirror 合并已存在的镜像源.
 func (cr *ConflictResolver) mergeExistingMirror(mergedMirrors map[string]MirrorConfig, remoteMirror *MirrorConfig, localMirror MirrorConfig) {
-	merged := *remoteMirror
-	merged.APIKey = localMirror.APIKey // 保留本地API密钥
+	merged := localMirror // 使用本地配置作为基础，保留本地所有修改
+	// 如果本地没有API密钥但远程有（且是加密的），保持本地为空（需要用户重新配置）
 	cr.setEnvKey(&merged)
 	mergedMirrors[remoteMirror.Name] = merged
 }

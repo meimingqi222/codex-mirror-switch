@@ -262,9 +262,9 @@ func (sm *SyncManager) handlePushAutoResolve(resolver *ConflictResolver, conflic
 	}
 
 	fmt.Printf("✅ 冲突已自动解决（智能合并）\n")
-	fmt.Printf("   - 保留了本地和云端的所有镜像源\n")
+	fmt.Printf("   - 优先保留本地配置修改（URL、模型名等）\n")
 	fmt.Printf("   - 保留了本地API密钥\n")
-	fmt.Printf("   - 新增的镜像源需要手动配置API密钥\n\n")
+	fmt.Printf("   - 合并了云端新增的镜像源\n\n")
 
 	// 现在推送合并后的配置
 	return sm.performPush(ConfigFileName)
