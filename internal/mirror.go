@@ -602,13 +602,15 @@ func (mm *MirrorManager) discoverCodexFromEnv(discoveredMirrors map[string]Mirro
 
 // SanitizeEnvVarName 将镜像源名称转换为合法的环境变量名称部分.
 func SanitizeEnvVarName(name string) string {
-	// 将连字符替换为下划线，移除其他特殊字符
+	// 将连字符和空格替换为下划线，保留原有下划线，移除其他特殊字符
 	sanitized := strings.Map(func(r rune) rune {
 		switch {
 		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
 			return r
-		case r == '-' || r == ' ' || r == '_':
-			return '_'
+		case r == '-' || r == ' ':
+			return '_'  // 将连字符和空格替换为下划线
+		case r == '_':
+			return '_'  // 保留原有下划线
 		default:
 			return -1 // 删除其他字符
 		}
@@ -639,11 +641,6 @@ func extractMirrorNameFromURL(urlStr, defaultName string) string {
 	host := u.Hostname()
 	if host == "" {
 		return defaultName
-	}
-
-	// 移除端口
-	if strings.Contains(host, ":") {
-		host = strings.Split(host, ":")[0]
 	}
 
 	// 分割域名部分

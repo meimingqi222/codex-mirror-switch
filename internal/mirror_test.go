@@ -546,6 +546,9 @@ func TestSystemConfigPersistence(t *testing.T) {
 		LastSync:     time.Now(),
 		SyncAPIKeys:  true,
 	}
+	if mm1.config == nil {
+		t.Fatalf("mm1.config 为 nil")
+	}
 	mm1.config.Sync = syncConfig
 	err = mm1.saveConfig()
 	if err != nil {
