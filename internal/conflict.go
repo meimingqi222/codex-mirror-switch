@@ -551,31 +551,22 @@ func (cr *ConflictResolver) selectCurrentMirrors(config *SystemConfig, mergedMir
 
 // selectCurrentMirror 选择当前激活的镜像源（通用逻辑）.
 func (cr *ConflictResolver) selectCurrentMirror(mergedMirrors map[string]MirrorConfig, localCurrent, remoteCurrent string, toolType ToolType) string {
+	// 检查本地激活源
 	if localCurrent != "" {
-		// 优先保留本地的激活源
 		if _, exists := mergedMirrors[localCurrent]; exists {
 			return localCurrent
-		} else if remoteCurrent != "" {
-			// 如果本地激活源不存在，尝试使用云端的激活源
-			if _, exists := mergedMirrors[remoteCurrent]; exists {
-				return remoteCurrent
-			} else {
-				return cr.selectDefaultMirror(mergedMirrors, toolType)
-			}
-		} else {
-			return cr.selectDefaultMirror(mergedMirrors, toolType)
 		}
-	} else if remoteCurrent != "" {
-		// 如果本地没有激活源，使用云端的激活源
+	}
+
+	// 检查云端激活源
+	if remoteCurrent != "" {
 		if _, exists := mergedMirrors[remoteCurrent]; exists {
 			return remoteCurrent
-		} else {
-			return cr.selectDefaultMirror(mergedMirrors, toolType)
 		}
-	} else {
-		// 都没有的话选择默认的
-		return cr.selectDefaultMirror(mergedMirrors, toolType)
 	}
+
+	// 如果都没有可用的激活源，选择默认的
+	return cr.selectDefaultMirror(mergedMirrors, toolType)
 }
 
 // FormatConflicts 格式化冲突信息用于显示.

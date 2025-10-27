@@ -91,6 +91,11 @@ const (
 	PlatformMac     Platform = "mac"
 	PlatformLinux   Platform = "linux"
 
+	// 平台字符串常量.
+	WindowsOS = "windows"
+	MacOS     = "mac"
+	LinuxOS   = "linux"
+
 	// 环境变量常量.
 	CodexSwitchAPIKeyEnv  = "CODEX_SWITCH_OPENAI_API_KEY"
 	AnthropicBaseURLEnv   = "ANTHROPIC_BASE_URL"

@@ -9,11 +9,11 @@ import (
 // GetCurrentPlatform 获取当前运行平台.
 func GetCurrentPlatform() Platform {
 	switch runtime.GOOS {
-	case "windows":
+	case WindowsOS:
 		return PlatformWindows
-	case "darwin":
+	case MacOS:
 		return PlatformMac
-	case "linux":
+	case LinuxOS:
 		return PlatformLinux
 	default:
 		return PlatformLinux // 默认使用Linux路径.

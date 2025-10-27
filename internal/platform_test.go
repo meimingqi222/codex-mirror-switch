@@ -14,11 +14,11 @@ func TestGetCurrentPlatform(t *testing.T) {
 	// 根据实际运行环境检查平台
 	expectedPlatform := PlatformLinux // 默认值
 	switch runtime.GOOS {
-	case "windows":
+	case WindowsOS:
 		expectedPlatform = PlatformWindows
-	case "darwin":
+	case MacOS:
 		expectedPlatform = PlatformMac
-	case "linux":
+	case LinuxOS:
 		expectedPlatform = PlatformLinux
 	}
 
@@ -184,7 +184,7 @@ func TestEnsureDir(t *testing.T) {
 // TestEnsureDirPermissions 测试目录权限.
 func TestEnsureDirPermissions(t *testing.T) {
 	// 在Windows上跳过权限测试
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == WindowsOS {
 		t.Skip("Skipping permission test on Windows")
 	}
 
@@ -331,9 +331,9 @@ func TestPlatformConstants(t *testing.T) {
 		platform Platform
 		expected string
 	}{
-		{PlatformWindows, "windows"},
-		{PlatformMac, "mac"},
-		{PlatformLinux, "linux"},
+		{PlatformWindows, WindowsOS},
+		{PlatformMac, MacOS},
+		{PlatformLinux, LinuxOS},
 	}
 
 	for _, tt := range tests {
