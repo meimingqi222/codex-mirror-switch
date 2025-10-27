@@ -538,20 +538,58 @@ func (cr *ConflictResolver) finalizeMergeConfig(config *SystemConfig, mergedMirr
 
 // selectCurrentMirrors 选择当前激活的镜像源.
 func (cr *ConflictResolver) selectCurrentMirrors(config *SystemConfig, mergedMirrors map[string]MirrorConfig) {
-	if cr.remoteData.CurrentCodex != "" {
+	// 对于 Codex 镜像源
+	if cr.localConfig.CurrentCodex != "" {
+		// 优先保留本地的激活源
+		if _, exists := mergedMirrors[cr.localConfig.CurrentCodex]; exists {
+			config.CurrentCodex = cr.localConfig.CurrentCodex
+		} else if cr.remoteData.CurrentCodex != "" {
+			// 如果本地激活源不存在，尝试使用云端的激活源
+			if _, exists := mergedMirrors[cr.remoteData.CurrentCodex]; exists {
+				config.CurrentCodex = cr.remoteData.CurrentCodex
+			} else {
+				config.CurrentCodex = cr.selectDefaultMirror(mergedMirrors, ToolTypeCodex)
+			}
+		} else {
+			config.CurrentCodex = cr.selectDefaultMirror(mergedMirrors, ToolTypeCodex)
+		}
+	} else if cr.remoteData.CurrentCodex != "" {
+		// 如果本地没有激活源，使用云端的激活源
 		if _, exists := mergedMirrors[cr.remoteData.CurrentCodex]; exists {
 			config.CurrentCodex = cr.remoteData.CurrentCodex
 		} else {
 			config.CurrentCodex = cr.selectDefaultMirror(mergedMirrors, ToolTypeCodex)
 		}
+	} else {
+		// 都没有的话选择默认的
+		config.CurrentCodex = cr.selectDefaultMirror(mergedMirrors, ToolTypeCodex)
 	}
 
-	if cr.remoteData.CurrentClaude != "" {
+	// 对于 Claude 镜像源
+	if cr.localConfig.CurrentClaude != "" {
+		// 优先保留本地的激活源
+		if _, exists := mergedMirrors[cr.localConfig.CurrentClaude]; exists {
+			config.CurrentClaude = cr.localConfig.CurrentClaude
+		} else if cr.remoteData.CurrentClaude != "" {
+			// 如果本地激活源不存在，尝试使用云端的激活源
+			if _, exists := mergedMirrors[cr.remoteData.CurrentClaude]; exists {
+				config.CurrentClaude = cr.remoteData.CurrentClaude
+			} else {
+				config.CurrentClaude = cr.selectDefaultMirror(mergedMirrors, ToolTypeClaude)
+			}
+		} else {
+			config.CurrentClaude = cr.selectDefaultMirror(mergedMirrors, ToolTypeClaude)
+		}
+	} else if cr.remoteData.CurrentClaude != "" {
+		// 如果本地没有激活源，使用云端的激活源
 		if _, exists := mergedMirrors[cr.remoteData.CurrentClaude]; exists {
 			config.CurrentClaude = cr.remoteData.CurrentClaude
 		} else {
 			config.CurrentClaude = cr.selectDefaultMirror(mergedMirrors, ToolTypeClaude)
 		}
+	} else {
+		// 都没有的话选择默认的
+		config.CurrentClaude = cr.selectDefaultMirror(mergedMirrors, ToolTypeClaude)
 	}
 }
 

@@ -624,8 +624,14 @@ func (sm *SyncManager) applySyncData(syncData *SyncData) error {
 
 	// 更新配置
 	sm.mirrorManager.config.Mirrors = newMirrors
-	sm.mirrorManager.config.CurrentCodex = syncData.CurrentCodex
-	sm.mirrorManager.config.CurrentClaude = syncData.CurrentClaude
+	
+	// 优先保留本地激活源配置，只有在本地没有设置时才使用云端的
+	if sm.mirrorManager.config.CurrentCodex == "" && syncData.CurrentCodex != "" {
+		sm.mirrorManager.config.CurrentCodex = syncData.CurrentCodex
+	}
+	if sm.mirrorManager.config.CurrentClaude == "" && syncData.CurrentClaude != "" {
+		sm.mirrorManager.config.CurrentClaude = syncData.CurrentClaude
+	}
 
 	// 保存配置
 	if err := sm.mirrorManager.saveConfig(); err != nil {
