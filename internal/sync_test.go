@@ -73,8 +73,8 @@ func (m *MockSyncProvider) GetInfo() ProviderInfo {
 
 // TestNewSyncManager 测试创建同步管理器.
 func TestNewSyncManager(t *testing.T) {
-	tempDir := setupTestDir(t)
-	mm := createTestMirrorManager(t, tempDir)
+	tempDir := setupTestDirWithCleanup(t)
+	mm := createTestMirrorManagerForSync(t, tempDir)
 
 	sm := NewSyncManager(mm)
 	if sm == nil {
@@ -96,8 +96,8 @@ func TestNewSyncManager(t *testing.T) {
 
 // TestInitSyncWithPassword 测试使用密码初始化同步.
 func TestInitSyncWithPassword(t *testing.T) {
-	tempDir := setupTestDir(t)
-	mm := createTestMirrorManager(t, tempDir)
+	tempDir := setupTestDirWithCleanup(t)
+	mm := createTestMirrorManagerForSync(t, tempDir)
 	sm := NewSyncManager(mm)
 
 	// 注意：由于不能修改生成函数，这个测试主要验证流程
@@ -147,8 +147,8 @@ func TestInitSyncWithPassword(t *testing.T) {
 
 // TestLoadSync 测试加载同步配置.
 func TestLoadSync(t *testing.T) {
-	tempDir := setupTestDir(t)
-	mm := createTestMirrorManager(t, tempDir)
+	tempDir := setupTestDirWithCleanup(t)
+	mm := createTestMirrorManagerForSync(t, tempDir)
 	sm := NewSyncManager(mm)
 
 	// 由于createProvider是方法而非字段，我们需要使用其他方式进行测试
@@ -210,8 +210,8 @@ func TestLoadSync(t *testing.T) {
 
 // TestExportSyncData 测试导出同步数据.
 func TestExportSyncData(t *testing.T) {
-	tempDir := setupTestDir(t)
-	mm := createTestMirrorManager(t, tempDir)
+	tempDir := setupTestDirWithCleanup(t)
+	mm := createTestMirrorManagerForSync(t, tempDir)
 	sm := NewSyncManager(mm)
 
 	// 设置测试数据
@@ -273,8 +273,8 @@ func TestExportSyncData(t *testing.T) {
 
 // TestApplySyncData 测试应用同步数据.
 func TestApplySyncData(t *testing.T) {
-	tempDir := setupTestDir(t)
-	mm := createTestMirrorManager(t, tempDir)
+	tempDir := setupTestDirWithCleanup(t)
+	mm := createTestMirrorManagerForSync(t, tempDir)
 	sm := NewSyncManager(mm)
 
 	// 创建测试同步数据
@@ -354,8 +354,8 @@ func TestApplySyncData(t *testing.T) {
 
 // TestEncryptDecryptData 测试数据加密解密.
 func TestEncryptDecryptData(t *testing.T) {
-	tempDir := setupTestDir(t)
-	mm := createTestMirrorManager(t, tempDir)
+	tempDir := setupTestDirWithCleanup(t)
+	mm := createTestMirrorManagerForSync(t, tempDir)
 	sm := NewSyncManager(mm)
 
 	// 设置加密配置
@@ -394,8 +394,8 @@ func TestEncryptDecryptData(t *testing.T) {
 
 // TestEncryptDataWithEmptyPassword 测试空密码的加密行为.
 func TestEncryptDataWithEmptyPassword(t *testing.T) {
-	tempDir := setupTestDir(t)
-	mm := createTestMirrorManager(t, tempDir)
+	tempDir := setupTestDirWithCleanup(t)
+	mm := createTestMirrorManagerForSync(t, tempDir)
 	sm := NewSyncManager(mm)
 
 	// 设置空密码配置
@@ -552,8 +552,8 @@ func TestSyncDataMarshalling(t *testing.T) {
 
 // TestCreateBackup 测试创建备份功能.
 func TestCreateBackup(t *testing.T) {
-	tempDir := setupTestDir(t)
-	mm := createTestMirrorManager(t, tempDir)
+	tempDir := setupTestDirWithCleanup(t)
+	mm := createTestMirrorManagerForSync(t, tempDir)
 	sm := NewSyncManager(mm)
 
 	// 添加一些测试数据
@@ -575,8 +575,8 @@ func TestCreateBackup(t *testing.T) {
 
 // TestIntelligentMergeWithDeletions 测试智能合并策略处理删除操作.
 func TestIntelligentMergeWithDeletions(t *testing.T) {
-	tempDir := setupTestDir(t)
-	mm := createTestMirrorManager(t, tempDir)
+	tempDir := setupTestDirWithCleanup(t)
+	mm := createTestMirrorManagerForSync(t, tempDir)
 	_ = NewSyncManager(mm) // 用于创建测试环境，但不直接使用
 
 	now := time.Now()
@@ -719,8 +719,8 @@ func TestIntelligentMergeWithDeletions(t *testing.T) {
 
 // TestConflictDetectionWithDeletedMirrors 测试删除镜像源的冲突检测.
 func TestConflictDetectionWithDeletedMirrors(t *testing.T) {
-	tempDir := setupTestDir(t)
-	_ = createTestMirrorManager(t, tempDir) // 用于创建测试环境，但不直接使用
+	tempDir := setupTestDirWithCleanup(t)
+	_ = createTestMirrorManagerForSync(t, tempDir) // 用于创建测试环境，但不直接使用
 
 	now := time.Now()
 
@@ -834,8 +834,8 @@ func TestConflictDetectionWithDeletedMirrors(t *testing.T) {
 
 // TestMirrorManagerSoftDelete 测试软删除功能.
 func TestMirrorManagerSoftDelete(t *testing.T) {
-	tempDir := setupTestDir(t)
-	mm := createTestMirrorManager(t, tempDir)
+	tempDir := setupTestDirWithCleanup(t)
+	mm := createTestMirrorManagerForSync(t, tempDir)
 
 	// 添加测试镜像源
 	err := mm.AddMirror("test-mirror", "https://test.com", "test-key")
@@ -879,8 +879,8 @@ func TestMirrorManagerSoftDelete(t *testing.T) {
 
 // TestExportSyncDataWithDeletedMirrors 测试导出同步数据包含已删除镜像源.
 func TestExportSyncDataWithDeletedMirrors(t *testing.T) {
-	tempDir := setupTestDir(t)
-	mm := createTestMirrorManager(t, tempDir)
+	tempDir := setupTestDirWithCleanup(t)
+	mm := createTestMirrorManagerForSync(t, tempDir)
 	sm := NewSyncManager(mm)
 
 	// 设置同步配置
@@ -1025,8 +1025,8 @@ func TestProviderInfo(t *testing.T) {
 	}
 }
 
-// setupTestDir 创建测试目录.
-func setupTestDir(t *testing.T) string {
+// setupTestDirWithCleanup 创建测试目录.
+func setupTestDirWithCleanup(t *testing.T) string {
 	tempDir, err := os.MkdirTemp("", "codex-mirror-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
@@ -1040,8 +1040,8 @@ func setupTestDir(t *testing.T) string {
 	return tempDir
 }
 
-// createTestMirrorManager 创建测试用的镜像管理器.
-func createTestMirrorManager(t *testing.T, tempDir string) *MirrorManager {
+// createTestMirrorManagerForSync 创建测试用的镜像管理器.
+func createTestMirrorManagerForSync(t *testing.T, tempDir string) *MirrorManager {
 	// 创建测试配置文件路径
 	configPath := filepath.Join(tempDir, "mirrors.toml")
 
