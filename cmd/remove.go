@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"codex-mirror/internal"
 
@@ -31,7 +32,8 @@ var removeCmd = &cobra.Command{
 		// 创建镜像源管理器
 		mm, err := internal.NewMirrorManager()
 		if err != nil {
-			fmt.Printf("错误: %v\n", err)
+			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
+			os.Exit(1)
 			return
 		}
 
@@ -53,7 +55,8 @@ var removeCmd = &cobra.Command{
 		// 检查是否为当前使用的镜像源
 		currentMirror, err := mm.GetCurrentMirror()
 		if err != nil {
-			fmt.Printf("获取当前镜像源失败: %v\n", err)
+			fmt.Fprintf(os.Stderr, "获取当前镜像源失败: %v\n", err)
+			os.Exit(1)
 			return
 		}
 
@@ -61,7 +64,8 @@ var removeCmd = &cobra.Command{
 
 		// 删除镜像源
 		if err := mm.RemoveMirror(mirrorName); err != nil {
-			fmt.Printf("删除镜像源失败: %v\n", err)
+			fmt.Fprintf(os.Stderr, "删除镜像源失败: %v\n", err)
+			os.Exit(1)
 			return
 		}
 

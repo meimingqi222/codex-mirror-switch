@@ -128,10 +128,14 @@ func TestAddCommand(t *testing.T) {
 		{
 			name:        "添加重复镜像源",
 			args:        []string{"add", "test-codex", "https://api.another.com", "sk-another"},
-			expectError: true,
+			expectError: false, // 会被特殊处理
 			checkOutput: func(t *testing.T, stdout, stderr string) {
+				// 检查第二个添加操作是否失败
+				if strings.Contains(stdout, "成功添加") {
+					t.Errorf("Should not succeed when adding duplicate mirror")
+				}
 				if !strings.Contains(stderr, "已存在") {
-					t.Errorf("Expected error about existing mirror, got stderr: %s", stderr)
+					t.Errorf("Expected error about existing mirror in stderr, got stderr: %s", stderr)
 				}
 			},
 		},
@@ -157,6 +161,28 @@ func TestAddCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// 对于重复镜像源测试，我们需要先添加镜像源，再测试重复添加
+			if tt.name == "添加重复镜像源" {
+				// 先添加一个镜像源
+				_, _, err1 := executeCommand(rootCmd, "add", "test-codex-dup", "https://api.dup.com", "sk-dup")
+				if err1 != nil {
+					t.Fatalf("Failed to add initial mirror: %v", err1)
+				}
+
+				// 再添加同名镜像源，应该失败
+				stdout, stderr, err := executeCommand(rootCmd, "add", "test-codex-dup", "https://api.another.com", "sk-another")
+				if err == nil {
+					t.Errorf("Expected error when adding duplicate mirror, but got none")
+					t.Errorf("stdout: %s", stdout)
+					t.Errorf("stderr: %s", stderr)
+				}
+
+				if tt.checkOutput != nil {
+					tt.checkOutput(t, stdout, stderr)
+				}
+				return
+			}
+
 			stdout, stderr, err := executeCommand(rootCmd, tt.args...)
 
 			if (err != nil) != tt.expectError {

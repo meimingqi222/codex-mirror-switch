@@ -607,7 +607,7 @@ func SanitizeEnvVarName(name string) string {
 		switch {
 		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
 			return r
-		case r == '-' || r == ' ':
+		case r == '-' || r == ' ' || r == '_':
 			return '_'
 		default:
 			return -1 // 删除其他字符
@@ -649,7 +649,8 @@ func extractMirrorNameFromURL(urlStr, defaultName string) string {
 	// 分割域名部分
 	parts := strings.Split(host, ".")
 	if len(parts) < 2 {
-		return defaultName
+		// 没有域名部分（如localhost），直接返回主机名
+		return host
 	}
 
 	// 提取主域名部分

@@ -511,6 +511,22 @@ func createTestMirrorManager(t *testing.T, tempDir string) *MirrorManager {
 func TestSystemConfigPersistence(t *testing.T) {
 	tempDir := setupTestDir(t)
 
+	// 设置临时环境变量
+	oldHome := os.Getenv("HOME")
+	if oldHome == "" {
+		oldHome = os.Getenv("USERPROFILE") // Windows
+	}
+
+	os.Setenv("HOME", tempDir)
+	os.Setenv("USERPROFILE", tempDir)
+
+	t.Cleanup(func() {
+		if oldHome != "" {
+			os.Setenv("HOME", oldHome)
+			os.Setenv("USERPROFILE", oldHome)
+		}
+	})
+
 	// 创建第一个管理器并添加配置
 	mm1 := createTestMirrorManager(t, tempDir)
 	err := mm1.AddMirror("persistence-test", "https://api.test.com", "test-key")
@@ -537,16 +553,16 @@ func TestSystemConfigPersistence(t *testing.T) {
 	}
 
 	// 创建第二个管理器，应该加载第一个的配置
-	mm2 := createTestMirrorManager(t, tempDir)
-	err = mm2.loadConfig()
+	configPath := filepath.Join(tempDir, ".codex-mirror", "mirrors.toml")
+	mm2, err := NewMirrorManagerWithPath(configPath)
 	if err != nil {
-		t.Fatalf("加载配置失败: %v", err)
+		t.Fatalf("创建第二个镜像管理器失败: %v", err)
 	}
 
 	// 验证配置是否正确加载
 	mirror, err := mm2.GetMirrorByName("persistence-test")
 	if err != nil {
-		t.Errorf("配置持久化失败，找不到镜像源: %v", err)
+		t.Fatalf("配置持久化失败，找不到镜像源: %v", err)
 	}
 	if mirror.BaseURL != "https://api.test.com" {
 		t.Errorf("配置持久化失败，期望 BaseURL 为 'https://api.test.com'，实际为 %s", mirror.BaseURL)

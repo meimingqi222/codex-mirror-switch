@@ -24,7 +24,8 @@ var statusCmd = &cobra.Command{
 		// 创建镜像源管理器
 		mm, err := internal.NewMirrorManager()
 		if err != nil {
-			fmt.Printf("错误: %v\n", err)
+			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
+			os.Exit(1)
 			return
 		}
 

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"codex-mirror/internal"
 
@@ -54,20 +55,23 @@ var addCmd = &cobra.Command{
 		case "claude":
 			internalToolType = internal.ToolTypeClaude
 		default:
-			fmt.Printf("错误: 无效的工具类型 '%s'，支持: codex, claude\n", toolType)
+			fmt.Fprintf(os.Stderr, "错误: 无效的工具类型 '%s'，支持: codex, claude\n", toolType)
+			os.Exit(1)
 			return
 		}
 
 		// 创建镜像源管理器
 		mm, err := internal.NewMirrorManager()
 		if err != nil {
-			fmt.Printf("错误: %v\n", err)
+			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
+			os.Exit(1)
 			return
 		}
 
 		// 添加镜像源
 		if err := mm.AddMirrorWithModel(name, baseURL, apiKey, internalToolType, modelName); err != nil {
-			fmt.Printf("添加镜像源失败: %v\n", err)
+			fmt.Fprintf(os.Stderr, "添加镜像源失败: %v\n", err)
+			os.Exit(1)
 			return
 		}
 

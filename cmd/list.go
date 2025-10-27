@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"codex-mirror/internal"
@@ -21,12 +22,28 @@ var listCmd = &cobra.Command{
 		// 创建镜像源管理器
 		mm, err := internal.NewMirrorManager()
 		if err != nil {
-			fmt.Printf("错误: %v\n", err)
+			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
+			os.Exit(1)
 			return
 		}
 
+		// 获取过滤器类型
+		filterType, _ := cmd.Flags().GetString("type")
+
 		// 获取所有镜像源
 		mirrors := mm.ListMirrors()
+
+		// 根据类型过滤
+		if filterType != "" {
+			var filtered []internal.MirrorConfig
+			for _, mirror := range mirrors {
+				if string(mirror.ToolType) == filterType {
+					filtered = append(filtered, mirror)
+				}
+			}
+			mirrors = filtered
+		}
+
 		if len(mirrors) == 0 {
 			fmt.Println("没有配置任何镜像源")
 			return
@@ -82,5 +99,6 @@ var listCmd = &cobra.Command{
 }
 
 func init() {
+	listCmd.Flags().StringP("type", "t", "", "过滤工具类型 (codex|claude)")
 	rootCmd.AddCommand(listCmd)
 }
