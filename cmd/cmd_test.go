@@ -96,8 +96,8 @@ func TestAddCommand(t *testing.T) {
 		checkOutput func(t *testing.T, stdout, stderr string)
 	}{
 		{
-			name: "添加基本Codex镜像源",
-			args: []string{"add", "test-codex", "https://api.test.com", "sk-test123"},
+			name:        "添加基本Codex镜像源",
+			args:        []string{"add", "test-codex", "https://api.test.com", "sk-test123"},
 			expectError: false,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				if !strings.Contains(stdout, "成功添加镜像源") {
@@ -106,8 +106,8 @@ func TestAddCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "添加Claude镜像源",
-			args: []string{"add", "test-claude", "https://api.anthropic.com", "sk-ant-test", "--type", "claude"},
+			name:        "添加Claude镜像源",
+			args:        []string{"add", "test-claude", "https://api.anthropic.com", "sk-ant-test", "--type", "claude"},
 			expectError: false,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				if !strings.Contains(stdout, "成功添加镜像源") {
@@ -116,8 +116,8 @@ func TestAddCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "添加带模型名称的Claude镜像源",
-			args: []string{"add", "test-claude-model", "https://api.custom.com", "sk-test", "--type", "claude", "--model", "claude-3-5-sonnet-20241022"},
+			name:        "添加带模型名称的Claude镜像源",
+			args:        []string{"add", "test-claude-model", "https://api.custom.com", "sk-test", "--type", "claude", "--model", "claude-3-5-sonnet-20241022"},
 			expectError: false,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				if !strings.Contains(stdout, "成功添加镜像源") {
@@ -126,8 +126,8 @@ func TestAddCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "添加重复镜像源",
-			args: []string{"add", "test-codex", "https://api.another.com", "sk-another"},
+			name:        "添加重复镜像源",
+			args:        []string{"add", "test-codex", "https://api.another.com", "sk-another"},
 			expectError: true,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				if !strings.Contains(stderr, "已存在") {
@@ -136,16 +136,16 @@ func TestAddCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "参数不足",
-			args: []string{"add", "onlyname"},
+			name:        "参数不足",
+			args:        []string{"add", "onlyname"},
 			expectError: true,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				// Cobra会处理参数验证错误
 			},
 		},
 		{
-			name: "无效的工具类型",
-			args: []string{"add", "invalid-type", "https://api.test.com", "sk-test", "--type", "invalid"},
+			name:        "无效的工具类型",
+			args:        []string{"add", "invalid-type", "https://api.test.com", "sk-test", "--type", "invalid"},
 			expectError: true,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				if !strings.Contains(stderr, "不支持的工具类型") {
@@ -188,8 +188,8 @@ func TestListCommand(t *testing.T) {
 		checkOutput func(t *testing.T, stdout, stderr string)
 	}{
 		{
-			name: "列出所有镜像源",
-			args: []string{"list"},
+			name:        "列出所有镜像源",
+			args:        []string{"list"},
 			expectError: false,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				if !strings.Contains(stdout, "test1") {
@@ -204,8 +204,8 @@ func TestListCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "列出Codex镜像源",
-			args: []string{"list", "--type", "codex"},
+			name:        "列出Codex镜像源",
+			args:        []string{"list", "--type", "codex"},
 			expectError: false,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				if !strings.Contains(stdout, "test1") {
@@ -221,8 +221,8 @@ func TestListCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "列出Claude镜像源",
-			args: []string{"list", "--type", "claude"},
+			name:        "列出Claude镜像源",
+			args:        []string{"list", "--type", "claude"},
 			expectError: false,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				if !strings.Contains(stdout, "test2") {
@@ -264,8 +264,8 @@ func TestSwitchCommand(t *testing.T) {
 		checkOutput func(t *testing.T, stdout, stderr string)
 	}{
 		{
-			name: "切换到存在的镜像源",
-			args: []string{"switch", "switch-test"},
+			name:        "切换到存在的镜像源",
+			args:        []string{"switch", "switch-test"},
 			expectError: false,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				combined := stdout + stderr
@@ -275,8 +275,8 @@ func TestSwitchCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "切换到不存在的镜像源",
-			args: []string{"switch", "nonexistent"},
+			name:        "切换到不存在的镜像源",
+			args:        []string{"switch", "nonexistent"},
 			expectError: true,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				if !strings.Contains(stderr, "不存在") {
@@ -285,8 +285,8 @@ func TestSwitchCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "参数不足",
-			args: []string{"switch"},
+			name:        "参数不足",
+			args:        []string{"switch"},
 			expectError: true,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				// Cobra会处理参数验证
@@ -326,8 +326,8 @@ func TestRemoveCommand(t *testing.T) {
 		checkOutput func(t *testing.T, stdout, stderr string)
 	}{
 		{
-			name: "删除存在的镜像源",
-			args: []string{"remove", "remove-test"},
+			name:        "删除存在的镜像源",
+			args:        []string{"remove", "remove-test"},
 			expectError: false,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				if !strings.Contains(stdout, "成功删除") {
@@ -336,8 +336,8 @@ func TestRemoveCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "删除不存在的镜像源",
-			args: []string{"remove", "nonexistent"},
+			name:        "删除不存在的镜像源",
+			args:        []string{"remove", "nonexistent"},
 			expectError: true,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				if !strings.Contains(stderr, "不存在") {
@@ -346,8 +346,8 @@ func TestRemoveCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "尝试删除官方镜像源",
-			args: []string{"remove", "official"},
+			name:        "尝试删除官方镜像源",
+			args:        []string{"remove", "official"},
 			expectError: true,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				if !strings.Contains(stderr, "不能删除官方镜像源") {
@@ -386,8 +386,8 @@ func TestStatusCommand(t *testing.T) {
 		checkOutput func(t *testing.T, stdout, stderr string)
 	}{
 		{
-			name: "查看状态",
-			args: []string{"status"},
+			name:        "查看状态",
+			args:        []string{"status"},
 			expectError: false,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				// 应该包含基本的状态信息
@@ -424,8 +424,8 @@ func TestHelpCommand(t *testing.T) {
 		checkOutput func(t *testing.T, stdout, stderr string)
 	}{
 		{
-			name: "根命令帮助",
-			args: []string{"--help"},
+			name:        "根命令帮助",
+			args:        []string{"--help"},
 			expectError: false,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				if !strings.Contains(stdout, "Codex镜像切换工具") {
@@ -437,8 +437,8 @@ func TestHelpCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "add命令帮助",
-			args: []string{"add", "--help"},
+			name:        "add命令帮助",
+			args:        []string{"add", "--help"},
 			expectError: false,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				if !strings.Contains(stdout, "添加新的镜像源") {
@@ -450,8 +450,8 @@ func TestHelpCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "switch命令帮助",
-			args: []string{"switch", "--help"},
+			name:        "switch命令帮助",
+			args:        []string{"switch", "--help"},
 			expectError: false,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				if !strings.Contains(stdout, "切换到指定的镜像源") {
@@ -654,8 +654,8 @@ func TestCommandFlags(t *testing.T) {
 		checkOutput func(t *testing.T, stdout, stderr string)
 	}{
 		{
-			name: "add命令with type标志",
-			args: []string{"add", "flag-test", "https://api.flag.com", "sk-flag", "--type", "claude"},
+			name:        "add命令with type标志",
+			args:        []string{"add", "flag-test", "https://api.flag.com", "sk-flag", "--type", "claude"},
 			expectError: false,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				if !strings.Contains(stdout, "成功添加") {
@@ -664,8 +664,8 @@ func TestCommandFlags(t *testing.T) {
 			},
 		},
 		{
-			name: "list命令with type过滤",
-			args: []string{"list", "--type", "claude"},
+			name:        "list命令with type过滤",
+			args:        []string{"list", "--type", "claude"},
 			expectError: false,
 			checkOutput: func(t *testing.T, stdout, stderr string) {
 				// 应该只显示Claude类型的镜像源

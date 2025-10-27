@@ -66,13 +66,13 @@ func TestLoadSettings(t *testing.T) {
 
 	// 创建测试设置文件
 	testSettings := map[string]interface{}{
-		"editor.fontSize":     14,
-		"editor.tabSize":      4,
-		"chatgpt.apiBase":     "https://api.test.com",
+		"editor.fontSize": 14,
+		"editor.tabSize":  4,
+		"chatgpt.apiBase": "https://api.test.com",
 		"chatgpt.config": map[string]interface{}{
-			"model":                    "gpt-4",
-			"preferred_auth_method":    "apikey",
-			"model_reasoning_effort":   "medium",
+			"model":                  "gpt-4",
+			"preferred_auth_method":  "apikey",
+			"model_reasoning_effort": "medium",
 		},
 		"other.setting": "value",
 	}
@@ -205,10 +205,10 @@ func TestVSCodeApplyMirror(t *testing.T) {
 		"editor.fontSize": 12,
 		"editor.theme":    "light",
 		"chatgpt.config": map[string]interface{}{
-			"old_setting":      "should_be_preserved",
-			"apiKey":           "should_be_removed",
-			"apiBaseUrl":       "should_be_removed",
-			"model":            "gpt-3", // 应该被覆盖
+			"old_setting": "should_be_preserved",
+			"apiKey":      "should_be_removed",
+			"apiBaseUrl":  "should_be_removed",
+			"model":       "gpt-3", // 应该被覆盖
 		},
 		"other.setting": "should_remain",
 	}
@@ -309,13 +309,13 @@ func TestVSCodeGetCurrentConfig(t *testing.T) {
 
 	// 创建包含ChatGPT配置的设置
 	testSettings := map[string]interface{}{
-		"editor.fontSize":     14,
-		"chatgpt.apiBase":     "https://api.current.com",
+		"editor.fontSize": 14,
+		"chatgpt.apiBase": "https://api.current.com",
 		"chatgpt.config": map[string]interface{}{
-			"model":                    "gpt-4",
-			"preferred_auth_method":    "apikey",
-			"model_reasoning_effort":   "high",
-			"wire_api":                 "responses",
+			"model":                  "gpt-4",
+			"preferred_auth_method":  "apikey",
+			"model_reasoning_effort": "high",
+			"wire_api":               "responses",
 		},
 		"other.setting": "value",
 	}
@@ -371,7 +371,7 @@ func TestBackupSettings(t *testing.T) {
 
 	// 创建测试设置文件
 	testSettings := map[string]interface{}{
-		"backup.test": "backup_value",
+		"backup.test":     "backup_value",
 		"editor.fontSize": 16,
 	}
 
@@ -423,9 +423,9 @@ func TestRemoveChatGPTConfig(t *testing.T) {
 
 	// 创建包含ChatGPT配置的设置
 	testSettings := map[string]interface{}{
-		"editor.fontSize":     14,
-		"editor.theme":        "dark",
-		"chatgpt.apiBase":     "https://api.remove.com",
+		"editor.fontSize": 14,
+		"editor.theme":    "dark",
+		"chatgpt.apiBase": "https://api.remove.com",
 		"chatgpt.config": map[string]interface{}{
 			"model":                 "gpt-4",
 			"preferred_auth_method": "apikey",

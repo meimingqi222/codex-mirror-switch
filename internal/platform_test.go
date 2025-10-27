@@ -91,10 +91,10 @@ func TestGetPathConfigPlatformSpecific(t *testing.T) {
 	defer restoreHome(oldHome)
 
 	tests := []struct {
-		name                  string
-		platform              Platform
-		expectedCodexDir      string
-		expectedVSCodeDir     string
+		name              string
+		platform          Platform
+		expectedCodexDir  string
+		expectedVSCodeDir string
 	}{
 		{
 			name:              "Windows路径",
