@@ -332,7 +332,7 @@ func TestPlatformConstants(t *testing.T) {
 		expected string
 	}{
 		{PlatformWindows, WindowsOS},
-		{PlatformMac, MacOS},
+		{PlatformMac, "mac"},
 		{PlatformLinux, LinuxOS},
 	}
 

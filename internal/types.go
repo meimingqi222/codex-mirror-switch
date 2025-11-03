@@ -93,7 +93,7 @@ const (
 
 	// 平台字符串常量.
 	WindowsOS = "windows"
-	MacOS     = "mac"
+	MacOS     = "darwin"
 	LinuxOS   = "linux"
 
 	// 环境变量常量.
