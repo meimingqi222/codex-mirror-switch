@@ -20,29 +20,23 @@ type MirrorManager struct {
 
 // NewMirrorManager 创建新的镜像源管理器.
 func NewMirrorManager() (*MirrorManager, error) {
+	// 优先检查环境变量指定的配置路径
+	if configPath := os.Getenv("CODEX_MIRROR_CONFIG_PATH"); configPath != "" {
+		return NewMirrorManagerWithPath(configPath)
+	}
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("获取用户主目录失败: %v", err)
 	}
 
-	configDir := filepath.Join(homeDir, ".codex-mirror")
-	if err := EnsureDir(configDir); err != nil {
-		return nil, fmt.Errorf("创建配置目录失败: %v", err)
-	}
+	configPath := filepath.Join(homeDir, ".codex-mirror", "mirrors.toml")
+	return NewMirrorManagerWithPath(configPath)
+}
 
-	configPath := filepath.Join(configDir, "mirrors.toml")
-	mm := &MirrorManager{
-		configPath: configPath,
-		config:     &SystemConfig{},
-	}
-
-	// 尝试加载现有配置
-	if err := mm.loadConfig(); err != nil {
-		// 如果配置文件不存在，检查是否有已存在的环境变量
-		mm.discoverFromEnvironment()
-	}
-
-	return mm, nil
+// GetConfigPath 返回配置文件路径.
+func (mm *MirrorManager) GetConfigPath() string {
+	return mm.configPath
 }
 
 // NewMirrorManagerWithPath 使用指定路径创建新的镜像源管理器.
@@ -139,7 +133,7 @@ func (mm *MirrorManager) AddMirrorWithModel(name, baseURL, apiKey string, toolTy
 			mirror.Deleted = false
 			mirror.DeletedAt = time.Time{}
 			mirror.LastModified = time.Now()
-			
+
 			// 根据工具类型设置环境变量key
 			switch toolType {
 			case ToolTypeCodex:
@@ -147,14 +141,14 @@ func (mm *MirrorManager) AddMirrorWithModel(name, baseURL, apiKey string, toolTy
 			case ToolTypeClaude:
 				mirror.EnvKey = AnthropicAuthTokenEnv
 			}
-			
+
 			// 如果是第一个该类型的配置，设置为当前激活的配置
 			if toolType == ToolTypeCodex && mm.config.CurrentCodex == "" {
 				mm.config.CurrentCodex = name
 			} else if toolType == ToolTypeClaude && mm.config.CurrentClaude == "" {
 				mm.config.CurrentClaude = name
 			}
-			
+
 			return mm.saveConfig()
 		}
 	}

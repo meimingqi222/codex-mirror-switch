@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"codex-mirror/internal"
 
@@ -26,15 +25,13 @@ var removeCmd = &cobra.Command{
   codex-mirror remove myapi
   codex-mirror remove local`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		mirrorName := args[0]
 
 		// 创建镜像源管理器
 		mm, err := internal.NewMirrorManager()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
-			os.Exit(1)
-			return
+			return fmt.Errorf("错误: %w", err)
 		}
 
 		// 检查镜像源是否存在（只检查未删除的）
@@ -48,25 +45,20 @@ var removeCmd = &cobra.Command{
 		}
 
 		if !found {
-			fmt.Printf("镜像源 '%s' 不存在\n", mirrorName)
-			return
+			return fmt.Errorf("错误: 镜像源 '%s' 不存在", mirrorName)
 		}
 
 		// 检查是否为当前使用的镜像源
 		currentMirror, err := mm.GetCurrentMirror()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "获取当前镜像源失败: %v\n", err)
-			os.Exit(1)
-			return
+			return fmt.Errorf("获取当前镜像源失败: %w", err)
 		}
 
 		isCurrentMirror := currentMirror.Name == mirrorName
 
 		// 删除镜像源
 		if err := mm.RemoveMirror(mirrorName); err != nil {
-			fmt.Fprintf(os.Stderr, "删除镜像源失败: %v\n", err)
-			os.Exit(1)
-			return
+			return fmt.Errorf("删除镜像源失败: %w", err)
 		}
 
 		fmt.Printf("成功删除镜像源 '%s'\n", mirrorName)
@@ -76,6 +68,7 @@ var removeCmd = &cobra.Command{
 			fmt.Println("由于删除的是当前使用的镜像源，已自动切换到官方镜像源")
 			fmt.Println("请运行 'codex-mirror switch official' 来更新配置文件")
 		}
+		return nil
 	},
 }
 

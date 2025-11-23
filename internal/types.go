@@ -182,3 +182,28 @@ type ProviderInfo struct {
 	MaxFileSize int64  `json:"max_file_size"` // 最大文件大小
 	Description string `json:"description"`   // 描述
 }
+
+// FieldConflict 字段级冲突信息.
+type FieldConflict struct {
+	FieldName    string    // 冲突的字段名 (BaseURL, ModelName, ToolType, APIKey)
+	LocalValue   string    // 本地值
+	RemoteValue  string    // 远程值
+	LocalTime    time.Time // 本地修改时间
+	RemoteTime   time.Time // 远程修改时间
+	RemoteDevice string    // 远程修改设备ID
+}
+
+// MirrorConflict 镜像源级冲突信息.
+type MirrorConflict struct {
+	MirrorName     string          // 镜像源名称
+	FieldConflicts []FieldConflict // 该镜像源的所有字段冲突
+	LocalMirror    *MirrorConfig   // 本地镜像源配置
+	RemoteMirror   *MirrorConfig   // 远程镜像源配置
+}
+
+// FieldResolution 字段解决结果.
+type FieldResolution struct {
+	FieldName     string // 字段名
+	ResolvedValue string // 解决后的值
+	Choice        string // 用户选择: "local", "remote", "manual"
+}

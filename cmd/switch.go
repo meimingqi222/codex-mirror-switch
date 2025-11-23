@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"codex-mirror/internal"
@@ -41,38 +40,30 @@ Codex 配置：修改配置文件并设置环境变量
   # PowerShell: codex-mirror switch myclaude --shell powershell | iex
 `,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		mirrorName := args[0]
 
 		// 创建镜像源管理器
 		mm, err := internal.NewMirrorManager()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
-			os.Exit(1)
-			return
+			return fmt.Errorf("错误: %w", err)
 		}
 
 		// 先检查镜像源是否存在，避免对不存在的镜像进行修复
 		_, err = mm.GetMirrorByName(mirrorName)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "获取镜像源配置失败: %v\n", err)
-			os.Exit(1)
-			return
+			return fmt.Errorf("获取镜像源配置失败: %w", err)
 		}
 
 		// 修复mirrors.toml中的env_key格式
 		if err := mm.FixEnvKeyFormat(); err != nil {
-			fmt.Fprintf(os.Stderr, "修复env_key格式失败: %v\n", err)
-			os.Exit(1)
-			return
+			return fmt.Errorf("修复env_key格式失败: %w", err)
 		}
 
 		// 重新获取目标镜像源配置（修复后可能已更新）
 		mirror, err := mm.GetMirrorByName(mirrorName)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "获取镜像源配置失败: %v\n", err)
-			os.Exit(1)
-			return
+			return fmt.Errorf("获取镜像源配置失败: %w", err)
 		}
 
 		// 如果是shell输出模式，只收集环境变量并输出shell导出语句
@@ -97,14 +88,12 @@ Codex 配置：修改配置文件并设置环境变量
 				}
 				envToEmit[envKey] = mirror.APIKey
 			default:
-				fmt.Fprintf(os.Stderr, "错误: 不支持的配置类型 '%s'\n", mirror.ToolType)
-				os.Exit(1)
-				return
+				return fmt.Errorf("错误: 不支持的配置类型 '%s'", mirror.ToolType)
 			}
 
 			// 输出shell导出语句并退出
 			emitShellExports(envToEmit, shellFmt)
-			return
+			return nil
 		}
 
 		// 非shell模式：正常执行配置应用和状态切换
@@ -114,27 +103,19 @@ Codex 配置：修改配置文件并设置环境变量
 		switch mirror.ToolType {
 		case internal.ToolTypeClaude:
 			if err := applyClaudeConfig(mirror); err != nil {
-				fmt.Fprintf(os.Stderr, "应用Claude配置失败: %v\n", err)
-				os.Exit(1)
-				return
+				return fmt.Errorf("应用Claude配置失败: %w", err)
 			}
 		case internal.ToolTypeCodex:
 			if err := applyCodexConfig(mirror); err != nil {
-				fmt.Fprintf(os.Stderr, "应用Codex配置失败: %v\n", err)
-				os.Exit(1)
-				return
+				return fmt.Errorf("应用Codex配置失败: %w", err)
 			}
 		default:
-			fmt.Fprintf(os.Stderr, "错误: 不支持的配置类型 '%s'\n", mirror.ToolType)
-			os.Exit(1)
-			return
+			return fmt.Errorf("错误: 不支持的配置类型 '%s'", mirror.ToolType)
 		}
 
 		// 切换镜像源状态
 		if err := mm.SwitchMirror(mirrorName); err != nil {
-			fmt.Fprintf(os.Stderr, "切换镜像源状态失败: %v\n", err)
-			os.Exit(1)
-			return
+			return fmt.Errorf("切换镜像源状态失败: %w", err)
 		}
 
 		fmt.Printf("\n成功切换到镜像源 '%s'\n", mirrorName)
@@ -143,6 +124,7 @@ Codex 配置：修改配置文件并设置环境变量
 		if mirror.APIKey != "" {
 			fmt.Printf("  API密钥: %s\n", maskAPIKey(mirror.APIKey))
 		}
+		return nil
 	},
 }
 

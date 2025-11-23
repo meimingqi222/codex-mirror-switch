@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -184,6 +185,11 @@ func (sm *SyncManager) PushWithStrategy(strategy string) error {
 		return err
 	}
 
+	// 推送前自动备份
+	if err := sm.createBackupWithPrefix("pre-push"); err != nil {
+		fmt.Printf("⚠️  创建备份失败: %v（继续推送）\n", err)
+	}
+
 	fmt.Printf("📤 正在推送配置到云端...\n")
 
 	// 首先检查是否存在云端配置，如果存在则进行冲突检查
@@ -194,6 +200,11 @@ func (sm *SyncManager) PushWithStrategy(strategy string) error {
 		if remoteData, err := sm.decryptData(encryptedRemoteData); err == nil {
 			var remoteSyncData SyncData
 			if err := json.Unmarshal(remoteData, &remoteSyncData); err == nil {
+				// 解密所有远程镜像源的 APIKey（在冲突检测之前）
+				if err := sm.decryptSyncDataAPIKeys(&remoteSyncData); err != nil {
+					fmt.Printf("⚠️  解密远程 API 密钥失败: %v（继续推送）\n", err)
+				}
+
 				// 检测冲突
 				resolver := NewConflictResolver(sm.mirrorManager.config, &remoteSyncData)
 				conflicts := resolver.DetectConflicts()
@@ -327,6 +338,11 @@ func (sm *SyncManager) PullWithStrategy(strategy string) error {
 		return err
 	}
 
+	// 拉取前自动备份
+	if err := sm.createBackupWithPrefix("pre-pull"); err != nil {
+		fmt.Printf("⚠️  创建备份失败: %v（继续拉取）\n", err)
+	}
+
 	// 直接使用标准配置文件名
 	filename := ConfigFileName
 	fmt.Printf("📥 正在从云端拉取配置...\n")
@@ -347,6 +363,11 @@ func (sm *SyncManager) PullWithStrategy(strategy string) error {
 	var syncData SyncData
 	if err := json.Unmarshal(data, &syncData); err != nil {
 		return fmt.Errorf("解析同步数据失败: %w", err)
+	}
+
+	// 解密所有远程镜像源的 APIKey（在冲突检测之前）
+	if err := sm.decryptSyncDataAPIKeys(&syncData); err != nil {
+		return fmt.Errorf("解密远程 API 密钥失败: %w", err)
 	}
 
 	// 检测冲突
@@ -491,10 +512,62 @@ func (sm *SyncManager) handleConflicts(resolver *ConflictResolver, conflicts *Co
 
 // createBackup 创建配置备份.
 func (sm *SyncManager) createBackup() error {
-	// 这里可以实现备份逻辑，比如保存到 ~/.codex-mirror/backup/ 目录
-	// 暂时简化实现
-	fmt.Printf("💾 已创建配置备份\n")
+	return sm.createBackupWithPrefix("backup")
+}
+
+// createBackupWithPrefix 使用指定前缀创建配置备份.
+func (sm *SyncManager) createBackupWithPrefix(prefix string) error {
+	// 使用 MirrorManager 的配置路径，而不是硬编码的系统路径
+	configPath := sm.mirrorManager.GetConfigPath()
+	configDir := filepath.Dir(configPath)
+	backupDir := filepath.Join(configDir, "backup")
+
+	if err := EnsureDir(backupDir); err != nil {
+		return fmt.Errorf("创建备份目录失败: %w", err)
+	}
+
+	// 生成备份文件名
+	timestamp := time.Now().Format("20060102-150405")
+	backupFileName := fmt.Sprintf("%s-%s.toml", prefix, timestamp)
+	backupPath := filepath.Join(backupDir, backupFileName)
+
+	// 复制当前配置文件
+	if err := copyFile(configPath, backupPath); err != nil {
+		return fmt.Errorf("创建备份失败: %w", err)
+	}
+
+	fmt.Printf("💾 已备份配置: %s\n", backupPath)
+
+	// 清理旧备份（保留最近10个）
+	sm.cleanOldBackups(backupDir, prefix, 10)
+
 	return nil
+}
+
+// cleanOldBackups 清理旧备份文件，保留指定数量的最新备份.
+func (sm *SyncManager) cleanOldBackups(backupDir, prefix string, keepCount int) {
+	entries, err := os.ReadDir(backupDir)
+	if err != nil {
+		return
+	}
+
+	// 筛选匹配前缀的备份文件
+	var backupFiles []os.DirEntry
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasPrefix(entry.Name(), prefix+"-") && strings.HasSuffix(entry.Name(), ".toml") {
+			backupFiles = append(backupFiles, entry)
+		}
+	}
+
+	// 如果备份数量超过限制，删除最旧的
+	if len(backupFiles) > keepCount {
+		// 按名称排序（时间戳格式保证字典序等于时间序）
+		// 删除最旧的
+		for i := 0; i < len(backupFiles)-keepCount; i++ {
+			oldFile := backupDir + "/" + backupFiles[i].Name()
+			_ = os.Remove(oldFile)
+		}
+	}
 }
 
 // GetStatus 获取同步状态.
@@ -716,6 +789,38 @@ func (sm *SyncManager) decryptAPIKey(encryptedKey string) (string, error) {
 	}
 
 	return string(decrypted), nil
+}
+
+// decryptSyncDataAPIKeys 解密同步数据中所有镜像源的 APIKey.
+func (sm *SyncManager) decryptSyncDataAPIKeys(syncData *SyncData) error {
+	// 解密活跃镜像源的 APIKey
+	for i := range syncData.Mirrors {
+		mirror := &syncData.Mirrors[i]
+		if mirror.APIKey != "" {
+			decryptedKey, err := sm.decryptAPIKey(mirror.APIKey)
+			if err != nil {
+				return fmt.Errorf("解密镜像源 '%s' 的 API 密钥失败: %w", mirror.Name, err)
+			}
+			mirror.APIKey = decryptedKey
+		}
+	}
+
+	// 解密已删除镜像源的 APIKey
+	for i := range syncData.DeletedMirrors {
+		mirror := &syncData.DeletedMirrors[i]
+		if mirror.APIKey != "" {
+			decryptedKey, err := sm.decryptAPIKey(mirror.APIKey)
+			if err != nil {
+				// 已删除的镜像源解密失败不影响主流程
+				fmt.Printf("⚠️  解密已删除镜像源 '%s' 的 API 密钥失败: %v\n", mirror.Name, err)
+				mirror.APIKey = ""
+			} else {
+				mirror.APIKey = decryptedKey
+			}
+		}
+	}
+
+	return nil
 }
 
 // validatePassword 验证用户密码是否能正确解密现有配置.

@@ -79,7 +79,7 @@ func (ccm *CodexConfigManager) FixEnvKeyFormat() error {
 	return nil
 }
 
-// UpdateConfig 更新Codex配置文件，根据提供的镜像配置更新或添加相应的模型提供商配置
+// UpdateConfig 更新Codex配置文件，根据提供的镜像配置更新或添加相应的模型提供商配置。
 func (ccm *CodexConfigManager) UpdateConfig(mirror *MirrorConfig) error {
 	config, rawConfig, err := ccm.loadExistingConfig()
 	if err != nil {

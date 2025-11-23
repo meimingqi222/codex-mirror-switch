@@ -564,7 +564,13 @@ func TestCreateBackup(t *testing.T) {
 		ToolType: ToolTypeCodex,
 	})
 
-	err := sm.createBackup()
+	// 保存配置到文件，这样createBackup才能找到文件
+	err := mm.SaveConfig()
+	if err != nil {
+		t.Fatalf("Failed to save config: %v", err)
+	}
+
+	err = sm.createBackup()
 	if err != nil {
 		t.Errorf("createBackup() error = %v", err)
 	}
@@ -654,6 +660,7 @@ func TestIntelligentMergeWithDeletions(t *testing.T) {
 
 	// 创建冲突解决器
 	resolver := NewConflictResolver(localConfig, remoteData)
+	resolver.SetInteractive(false) // 测试中禁用交互模式
 	conflicts := resolver.DetectConflicts()
 
 	// 验证冲突检测结果
@@ -755,6 +762,7 @@ func TestConflictDetectionWithDeletedMirrors(t *testing.T) {
 	}
 
 	resolver1 := NewConflictResolver(localConfig1, remoteData1)
+	resolver1.SetInteractive(false) // 测试中禁用交互模式
 	conflicts1 := resolver1.DetectConflicts()
 
 	// 应该检测到删除冲突
@@ -813,6 +821,7 @@ func TestConflictDetectionWithDeletedMirrors(t *testing.T) {
 	}
 
 	resolver2 := NewConflictResolver(localConfig2, remoteData2)
+	resolver2.SetInteractive(false) // 测试中禁用交互模式
 	conflicts2 := resolver2.DetectConflicts()
 
 	// 应该检测到删除冲突

@@ -25,11 +25,23 @@ func TestNewMirrorManager(t *testing.T) {
 	// 使用临时目录作为home目录
 	os.Setenv("HOME", tempDir)
 	os.Setenv("USERPROFILE", tempDir)
+
+	// 设置配置文件路径环境变量
+	configPath := filepath.Join(tempDir, ".codex-mirror", "mirrors.toml")
+	os.Setenv("CODEX_MIRROR_CONFIG_PATH", configPath)
+
+	// 创建配置文件的父目录
+	configDir := filepath.Dir(configPath)
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("Failed to create config directory: %v", err)
+	}
+
 	defer func() {
 		if oldHome != "" {
 			os.Setenv("HOME", oldHome)
 			os.Setenv("USERPROFILE", oldHome)
 		}
+		os.Unsetenv("CODEX_MIRROR_CONFIG_PATH")
 	}()
 
 	mm, err := NewMirrorManager()
@@ -42,7 +54,6 @@ func TestNewMirrorManager(t *testing.T) {
 	}
 
 	// 检查配置目录是否创建
-	configDir := filepath.Join(tempDir, ".codex-mirror")
 	if _, err := os.Stat(configDir); os.IsNotExist(err) {
 		t.Errorf("配置目录 %s 未创建", configDir)
 	}

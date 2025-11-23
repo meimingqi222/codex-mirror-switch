@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -19,9 +20,17 @@ const (
 	StrategyRemote string = "remote" // 远程优先
 	StrategyMerge  string = "merge"  // 智能合并
 	StrategyAbort  string = "abort"  // 取消操作
+	StrategyAuto   string = "auto"   // 自动选择
+	StrategyManual string = "manual" // 手动选择
 
 	// Configuration file names.
 	ConfigFileName string = "codex-mirror-config.json"
+
+	// Field names for conflict resolution.
+	FieldNameToolType string = "ToolType"
+	FieldNameAPIKey   string = "APIKey"
+	FieldNameBaseURL  string = "BaseURL"
+	FieldNameModel    string = "ModelName"
 )
 
 // ConflictItem 冲突项.
@@ -44,6 +53,7 @@ type ConflictResolution struct {
 type ConflictResolver struct {
 	localConfig *SystemConfig
 	remoteData  *SyncData
+	Interactive bool // 是否启用交互模式，默认为 true
 }
 
 // NewConflictResolver 创建冲突解决器.
@@ -51,7 +61,13 @@ func NewConflictResolver(localConfig *SystemConfig, remoteData *SyncData) *Confl
 	return &ConflictResolver{
 		localConfig: localConfig,
 		remoteData:  remoteData,
+		Interactive: true, // 默认启用交互模式
 	}
+}
+
+// SetInteractive 设置是否启用交互模式.
+func (cr *ConflictResolver) SetInteractive(interactive bool) {
+	cr.Interactive = interactive
 }
 
 // DetectConflicts 检测配置冲突.
@@ -254,10 +270,98 @@ func (cr *ConflictResolver) checkCurrentConflicts() []ConflictItem {
 
 // isMirrorModified 检查镜像源是否被修改.
 func (cr *ConflictResolver) isMirrorModified(local, remote *MirrorConfig) bool {
-	// 比较关键字段（忽略API密钥，因为远程的是加密的）
+	// 比较关键字段，需要先解密远程的 APIKey
+	remoteAPIKey := cr.decryptRemoteAPIKey(remote.APIKey)
+	apiKeyConflict := local.APIKey != "" && remoteAPIKey != "" && local.APIKey != remoteAPIKey
+
 	return local.BaseURL != remote.BaseURL ||
 		local.ToolType != remote.ToolType ||
-		local.ModelName != remote.ModelName
+		local.ModelName != remote.ModelName ||
+		apiKeyConflict
+}
+
+// DetectFieldConflicts 检测两个镜像源之间的字段级冲突.
+// 返回需要用户选择的冲突字段列表，不包括可以自动合并的字段.
+func (cr *ConflictResolver) DetectFieldConflicts(local, remote *MirrorConfig) []FieldConflict {
+	var conflicts []FieldConflict
+
+	// 检查 BaseURL
+	if local.BaseURL != remote.BaseURL {
+		conflicts = append(conflicts, FieldConflict{
+			FieldName:    FieldNameBaseURL,
+			LocalValue:   local.BaseURL,
+			RemoteValue:  remote.BaseURL,
+			LocalTime:    local.LastModified,
+			RemoteTime:   remote.LastModified,
+			RemoteDevice: cr.remoteData.DeviceID,
+		})
+	}
+
+	// 检查 ModelName
+	if local.ModelName != remote.ModelName {
+		conflicts = append(conflicts, FieldConflict{
+			FieldName:    FieldNameModel,
+			LocalValue:   local.ModelName,
+			RemoteValue:  remote.ModelName,
+			LocalTime:    local.LastModified,
+			RemoteTime:   remote.LastModified,
+			RemoteDevice: cr.remoteData.DeviceID,
+		})
+	}
+
+	// 检查 ToolType
+	if local.ToolType != remote.ToolType {
+		conflicts = append(conflicts, FieldConflict{
+			FieldName:    FieldNameToolType,
+			LocalValue:   string(local.ToolType),
+			RemoteValue:  string(remote.ToolType),
+			LocalTime:    local.LastModified,
+			RemoteTime:   remote.LastModified,
+			RemoteDevice: cr.remoteData.DeviceID,
+		})
+	}
+
+	// 检查 APIKey - 需要先解密远程的 APIKey 再比较
+	// 远程的 APIKey 可能是 "enc:xxxx" 格式（二次加密）
+	remoteAPIKey := cr.decryptRemoteAPIKey(remote.APIKey)
+	if local.APIKey != "" && remoteAPIKey != "" && local.APIKey != remoteAPIKey {
+		conflicts = append(conflicts, FieldConflict{
+			FieldName:    FieldNameAPIKey,
+			LocalValue:   local.APIKey,
+			RemoteValue:  remoteAPIKey, // 使用解密后的值
+			LocalTime:    local.LastModified,
+			RemoteTime:   remote.LastModified,
+			RemoteDevice: cr.remoteData.DeviceID,
+		})
+	}
+
+	return conflicts
+}
+
+// AutoMergeNonConflicting 自动合并无冲突的字段.
+// 处理单方修改或单方有值的情况，返回合并后的配置和自动合并的信息.
+func (cr *ConflictResolver) AutoMergeNonConflicting(local, remote *MirrorConfig) (*MirrorConfig, []FieldResolution) {
+	merged := *local // 使用本地作为基础
+	var autoResolutions []FieldResolution
+
+	// APIKey 特殊处理 - 需要先解密远程的 APIKey
+	remoteAPIKey := cr.decryptRemoteAPIKey(remote.APIKey)
+
+	if local.APIKey == "" && remoteAPIKey != "" {
+		// 本地没有，远程有 → 使用远程（解密后的）
+		merged.APIKey = remoteAPIKey
+		autoResolutions = append(autoResolutions, FieldResolution{
+			FieldName:     FieldNameAPIKey,
+			ResolvedValue: maskAPIKey(remoteAPIKey), // 显示时脱敏
+			Choice:        StrategyAuto,
+		})
+		PrintAutoMergeInfo(FieldNameAPIKey, maskAPIKey(remoteAPIKey), "本地为空，使用远程")
+	}
+	// 如果本地有，远程没有 → 保持本地（已经是了）
+	// 如果都有且相同 → 保持本地（已经是了）
+	// 如果都有且不同 → 这是冲突，由交互式解决
+
+	return &merged, autoResolutions
 }
 
 // isIntentionalDeletion 检查是否是明确的本地删除操作.
@@ -464,17 +568,85 @@ func (cr *ConflictResolver) hasDeleteConflict(mirrorName string, resolution *Con
 }
 
 // mergeExistingMirror 合并已存在的镜像源.
+// 使用字段级冲突检测和交互式解决.
 func (cr *ConflictResolver) mergeExistingMirror(mergedMirrors map[string]MirrorConfig, remoteMirror *MirrorConfig, localMirror MirrorConfig) {
-	merged := localMirror // 使用本地配置作为基础
+	// 1. 先进行自动合并（处理单方有值的情况，如本地无APIKey但远程有）
+	merged, autoResolutions := cr.AutoMergeNonConflicting(&localMirror, remoteMirror)
 
-	// 合并远程的BaseURL（假设远程更新更及时）
-	merged.BaseURL = remoteMirror.BaseURL
+	// 2. 检测字段级冲突
+	fieldConflicts := cr.DetectFieldConflicts(&localMirror, remoteMirror)
 
-	// 保留本地的API密钥和模型名称（本地可能有用户最新的配置）
-	// 如果本地没有API密钥但远程有，保持本地为空（需要用户重新配置）
+	// 3. 如果有字段冲突
+	if len(fieldConflicts) > 0 {
+		var userResolutions []FieldResolution
 
-	cr.setEnvKey(&merged)
-	mergedMirrors[remoteMirror.Name] = merged
+		if cr.Interactive {
+			// 交互模式：逐个询问用户
+			PrintConflictHeader(localMirror.Name, len(fieldConflicts))
+
+			for i, conflict := range fieldConflicts {
+				resolvedValue, choice, err := PromptFieldChoice(conflict, i+1, len(fieldConflicts))
+				if err != nil {
+					// 出错时默认保留本地
+					resolvedValue = conflict.LocalValue
+					choice = StrategyLocal
+				}
+
+				userResolutions = append(userResolutions, FieldResolution{
+					FieldName:     conflict.FieldName,
+					ResolvedValue: resolvedValue,
+					Choice:        choice,
+				})
+
+				// 应用用户选择到合并结果
+				cr.applyFieldResolution(merged, conflict.FieldName, resolvedValue)
+			}
+
+			// 合并自动解决和用户解决的结果用于显示
+			autoResolutions = append(autoResolutions, userResolutions...)
+			ShowMergeResult(localMirror.Name, autoResolutions)
+		} else {
+			// 非交互模式：基于时间戳自动选择（最新修改的胜出）
+			for _, conflict := range fieldConflicts {
+				var resolvedValue string
+				var choice string
+
+				// 比较时间戳，选择最新修改的
+				if conflict.RemoteTime.After(conflict.LocalTime) {
+					resolvedValue = conflict.RemoteValue
+					choice = StrategyRemote
+				} else {
+					resolvedValue = conflict.LocalValue
+					choice = StrategyLocal
+				}
+
+				userResolutions = append(userResolutions, FieldResolution{
+					FieldName:     conflict.FieldName,
+					ResolvedValue: resolvedValue,
+					Choice:        choice,
+				})
+
+				cr.applyFieldResolution(merged, conflict.FieldName, resolvedValue)
+			}
+		}
+	}
+
+	cr.setEnvKey(merged)
+	mergedMirrors[remoteMirror.Name] = *merged
+}
+
+// applyFieldResolution 将字段解决结果应用到镜像源配置.
+func (cr *ConflictResolver) applyFieldResolution(mirror *MirrorConfig, fieldName, value string) {
+	switch fieldName {
+	case FieldNameBaseURL:
+		mirror.BaseURL = value
+	case FieldNameModel:
+		mirror.ModelName = value
+	case FieldNameToolType:
+		mirror.ToolType = ToolType(value)
+	case FieldNameAPIKey:
+		mirror.APIKey = value
+	}
 }
 
 // mergeNewMirror 合并新的镜像源.
@@ -567,6 +739,29 @@ func (cr *ConflictResolver) selectCurrentMirror(mergedMirrors map[string]MirrorC
 
 	// 如果都没有可用的激活源，选择默认的
 	return cr.selectDefaultMirror(mergedMirrors, toolType)
+}
+
+// decryptRemoteAPIKey 解密远程的 APIKey（如果是加密格式）。
+// 注意：在调用 ConflictResolver 之前，应该已经通过 SyncManager.decryptSyncDataAPIKeys 解密了所有远程 APIKey。
+// 这个方法只是为了兼容性，实际上远程数据应该已经是明文了。
+func (cr *ConflictResolver) decryptRemoteAPIKey(apiKey string) string {
+	// 如果还是加密格式，说明解密流程有问题，返回空字符串避免错误比较
+	if strings.HasPrefix(apiKey, "enc:") {
+		fmt.Printf("⚠️  警告：远程 APIKey 仍然是加密格式，可能导致冲突检测不准确\n")
+		return ""
+	}
+	return apiKey
+}
+
+// maskAPIKey 脱敏显示 APIKey.
+func maskAPIKey(apiKey string) string {
+	if apiKey == "" {
+		return ""
+	}
+	if len(apiKey) <= 8 {
+		return "****"
+	}
+	return apiKey[:4] + "****" + apiKey[len(apiKey)-4:]
 }
 
 // FormatConflicts 格式化冲突信息用于显示.

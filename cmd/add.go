@@ -30,62 +30,63 @@ var addCmd = &cobra.Command{
   codex-mirror add custom https://api.custom.com sk-key --type claude --model claude-3-5-sonnet-20241022
   codex-mirror add local http://localhost:8080`,
 	Args: cobra.RangeArgs(2, 3),
-	Run: func(cmd *cobra.Command, args []string) {
-		name := args[0]
-		baseURL := args[1]
-		apiKey := ""
-		if len(args) > 2 {
-			apiKey = args[2]
-		}
+	RunE: runAddCommand,
+}
 
-		// 获取工具类型
-		toolType, _ := cmd.Flags().GetString("type")
-		if toolType == "" {
-			toolType = "codex" // 默认为 codex
-		}
+// runAddCommand 执行add命令的实际逻辑.
+func runAddCommand(cmd *cobra.Command, args []string) error {
+	name := args[0]
+	baseURL := args[1]
+	apiKey := ""
+	if len(args) > 2 {
+		apiKey = args[2]
+	}
 
-		// 获取模型名称
-		modelName, _ := cmd.Flags().GetString("model")
+	// 获取工具类型
+	toolType, _ := cmd.Flags().GetString("type")
+	if toolType == "" {
+		toolType = "codex" // 默认为 codex
+	}
 
-		// 验证工具类型
-		var internalToolType internal.ToolType
-		switch toolType {
-		case "codex":
-			internalToolType = internal.ToolTypeCodex
-		case "claude":
-			internalToolType = internal.ToolTypeClaude
-		default:
-			fmt.Fprintf(os.Stderr, "错误: 无效的工具类型 '%s'，支持: codex, claude\n", toolType)
-			os.Exit(1)
-			return
-		}
+	// 获取模型名称
+	modelName, _ := cmd.Flags().GetString("model")
 
-		// 创建镜像源管理器
-		mm, err := internal.NewMirrorManager()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
-			os.Exit(1)
-			return
-		}
+	// 验证工具类型
+	var internalToolType internal.ToolType
+	switch toolType {
+	case "codex":
+		internalToolType = internal.ToolTypeCodex
+	case "claude":
+		internalToolType = internal.ToolTypeClaude
+	default:
+		return fmt.Errorf("无效的工具类型 '%s'，支持: codex, claude", toolType)
+	}
 
-		// 添加镜像源
-		if err := mm.AddMirrorWithModel(name, baseURL, apiKey, internalToolType, modelName); err != nil {
-			fmt.Fprintf(os.Stderr, "添加镜像源失败: %v\n", err)
-			os.Exit(1)
-			return
-		}
+	// 创建镜像源管理器
+	mm, err := internal.NewMirrorManager()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "错误: %v\n", err)
+		return fmt.Errorf("%v", err)
+	}
 
-		fmt.Printf("成功添加镜像源 '%s'\n", name)
-		fmt.Printf("  名称: %s\n", name)
-		fmt.Printf("  类型: %s\n", toolType)
-		fmt.Printf("  URL: %s\n", baseURL)
-		if apiKey != "" {
-			fmt.Printf("  API密钥: %s\n", maskAPIKey(apiKey))
-		}
-		if modelName != "" {
-			fmt.Printf("  模型: %s\n", modelName)
-		}
-	},
+	// 添加镜像源
+	if err := mm.AddMirrorWithModel(name, baseURL, apiKey, internalToolType, modelName); err != nil {
+		fmt.Fprintf(os.Stderr, "添加镜像源失败: %v\n", err)
+		return fmt.Errorf("添加镜像源失败: %v", err)
+	}
+
+	fmt.Printf("成功添加镜像源 '%s'\n", name)
+	fmt.Printf("  名称: %s\n", name)
+	fmt.Printf("  类型: %s\n", toolType)
+	fmt.Printf("  URL: %s\n", baseURL)
+	if apiKey != "" {
+		fmt.Printf("  API密钥: %s\n", maskAPIKey(apiKey))
+	}
+	if modelName != "" {
+		fmt.Printf("  模型: %s\n", modelName)
+	}
+
+	return nil
 }
 
 func init() {

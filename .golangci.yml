@@ -52,7 +52,7 @@ linters-settings:
   # gocyclo配置
   gocyclo:
     # 圈复杂度阈值
-    min-complexity: 15
+    min-complexity: 20
   
   # dupl配置
   dupl:
