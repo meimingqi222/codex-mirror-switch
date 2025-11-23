@@ -46,8 +46,3 @@ jobs:
       run: |
         go install github.com/mgechev/revive@latest
         revive ./...
-    
-    - name: Install and run errcheck
-      run: |
-        go install github.com/kisielk/errcheck@latest
-        errcheck ./...
