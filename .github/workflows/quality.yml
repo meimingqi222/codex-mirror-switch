@@ -1,10 +1,9 @@
 name: Code Quality Checks
 
 on:
-  push:
-    branches: [ main, develop ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:  # 允许手动触发
 
 jobs:
   quality-checks:
