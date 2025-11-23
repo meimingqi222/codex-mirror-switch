@@ -79,6 +79,7 @@ func (ccm *CodexConfigManager) FixEnvKeyFormat() error {
 	return nil
 }
 
+// UpdateConfig 更新Codex配置文件，根据提供的镜像配置更新或添加相应的模型提供商配置
 func (ccm *CodexConfigManager) UpdateConfig(mirror *MirrorConfig) error {
 	config, rawConfig, err := ccm.loadExistingConfig()
 	if err != nil {
@@ -91,6 +92,7 @@ func (ccm *CodexConfigManager) UpdateConfig(mirror *MirrorConfig) error {
 	return ccm.writeConfigFile(rawConfig)
 }
 
+// loadExistingConfig 加载现有的Codex配置文件.
 func (ccm *CodexConfigManager) loadExistingConfig() (*CodexConfig, map[string]interface{}, error) {
 	var config CodexConfig
 	var rawConfig map[string]interface{}
@@ -115,6 +117,7 @@ func (ccm *CodexConfigManager) loadExistingConfig() (*CodexConfig, map[string]in
 	return &config, rawConfig, nil
 }
 
+// decodeConfigFiles 解码Codex配置文件.
 func (ccm *CodexConfigManager) decodeConfigFiles(config *CodexConfig) (map[string]interface{}, error) {
 	var rawConfig map[string]interface{}
 
@@ -129,6 +132,7 @@ func (ccm *CodexConfigManager) decodeConfigFiles(config *CodexConfig) (map[strin
 	return rawConfig, nil
 }
 
+// createProviderConfig 根据提供的镜像配置创建模型提供商配置.
 func (ccm *CodexConfigManager) createProviderConfig(mirror *MirrorConfig, config *CodexConfig) ModelProviderConfig {
 	if config.ModelProviders == nil {
 		config.ModelProviders = make(map[string]ModelProviderConfig)
@@ -149,6 +153,7 @@ func (ccm *CodexConfigManager) createProviderConfig(mirror *MirrorConfig, config
 	return providerConfig
 }
 
+// mergeExistingProviderConfig 合并现有的模型提供商配置.
 func (ccm *CodexConfigManager) mergeExistingProviderConfig(providerConfig *ModelProviderConfig, existingProvider ModelProviderConfig) {
 	if existingProvider.WireAPI != "" {
 		providerConfig.WireAPI = existingProvider.WireAPI
@@ -161,6 +166,7 @@ func (ccm *CodexConfigManager) mergeExistingProviderConfig(providerConfig *Model
 	providerConfig.RequiresOpenAIAuth = existingProvider.RequiresOpenAIAuth
 }
 
+// updateConfigStructures 更新配置结构体和原始配置.
 func (ccm *CodexConfigManager) updateConfigStructures(config *CodexConfig, rawConfig map[string]interface{}, mirrorName string, providerConfig ModelProviderConfig) {
 	// 更新 config 结构体中的 ModelProviders
 	if config.ModelProviders == nil {
@@ -184,6 +190,7 @@ func (ccm *CodexConfigManager) updateConfigStructures(config *CodexConfig, rawCo
 	ccm.updateRawConfigModelProviders(rawConfig, mirrorName, providerConfig, existingProviders)
 }
 
+// updateRawConfigBasicFields 更新原始配置中的基础字段.
 func (ccm *CodexConfigManager) updateRawConfigBasicFields(rawConfig map[string]interface{}, config *CodexConfig, mirrorName string) {
 	rawConfig["model_provider"] = mirrorName
 
@@ -202,6 +209,7 @@ func (ccm *CodexConfigManager) updateRawConfigBasicFields(rawConfig map[string]i
 	rawConfig["disable_response_storage"] = config.DisableResponseStorage
 }
 
+// updateRawConfigModelProviders 更新原始配置中的模型提供商配置.
 func (ccm *CodexConfigManager) updateRawConfigModelProviders(rawConfig map[string]interface{}, mirrorName string, providerConfig ModelProviderConfig, existingProviders map[string]ModelProviderConfig) {
 	// 使用扁平化结构 [model_providers.mirrorname]
 	// 保留现有镜像的配置，只更新当前镜像
@@ -244,6 +252,7 @@ func (ccm *CodexConfigManager) updateRawConfigModelProviders(rawConfig map[strin
 	}
 }
 
+// writeConfigFile 将配置写入文件.
 func (ccm *CodexConfigManager) writeConfigFile(rawConfig map[string]interface{}) error {
 	file, err := os.Create(ccm.configPath)
 	if err != nil {
@@ -282,11 +291,13 @@ func (ccm *CodexConfigManager) writeConfigFile(rawConfig map[string]interface{})
 	return nil
 }
 
+// isMap 判断给定的值是否为 map[string]interface{}.
 func isMap(value interface{}) bool {
 	_, ok := value.(map[string]interface{})
 	return ok
 }
 
+// writeTOMLMap 将 map[string]interface{} 写入 TOML 文件.
 func writeTOMLMap(file *os.File, m map[string]interface{}, indent string) error {
 	for key, value := range m {
 		if err := writeTOMLValue(file, key, value, indent); err != nil {
@@ -296,6 +307,7 @@ func writeTOMLMap(file *os.File, m map[string]interface{}, indent string) error 
 	return nil
 }
 
+// writeTOMLValue 将单个键值对写入 TOML 文件.
 func writeTOMLValue(file *os.File, key string, value interface{}, indent string) error {
 	switch v := value.(type) {
 	case string:

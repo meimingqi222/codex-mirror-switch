@@ -124,11 +124,38 @@ func (mm *MirrorManager) AddMirrorWithType(name, baseURL, apiKey string, toolTyp
 
 // AddMirrorWithModel 添加指定类型和模型名称的镜像源.
 func (mm *MirrorManager) AddMirrorWithModel(name, baseURL, apiKey string, toolType ToolType, modelName string) error {
-	// 检查镜像源是否已存在
+	// 检查镜像源是否已存在（只检查未删除的）
 	for i := range mm.config.Mirrors {
 		mirror := &mm.config.Mirrors[i]
-		if mirror.Name == name {
+		if mirror.Name == name && !mirror.Deleted {
 			return fmt.Errorf("镜像源 '%s' 已存在", name)
+		}
+		// 如果找到已删除的同名镜像源，恢复它
+		if mirror.Name == name && mirror.Deleted {
+			mirror.BaseURL = baseURL
+			mirror.APIKey = apiKey
+			mirror.ToolType = toolType
+			mirror.ModelName = modelName
+			mirror.Deleted = false
+			mirror.DeletedAt = time.Time{}
+			mirror.LastModified = time.Now()
+			
+			// 根据工具类型设置环境变量key
+			switch toolType {
+			case ToolTypeCodex:
+				mirror.EnvKey = CodexSwitchAPIKeyEnv
+			case ToolTypeClaude:
+				mirror.EnvKey = AnthropicAuthTokenEnv
+			}
+			
+			// 如果是第一个该类型的配置，设置为当前激活的配置
+			if toolType == ToolTypeCodex && mm.config.CurrentCodex == "" {
+				mm.config.CurrentCodex = name
+			} else if toolType == ToolTypeClaude && mm.config.CurrentClaude == "" {
+				mm.config.CurrentClaude = name
+			}
+			
+			return mm.saveConfig()
 		}
 	}
 

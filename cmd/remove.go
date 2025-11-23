@@ -37,8 +37,8 @@ var removeCmd = &cobra.Command{
 			return
 		}
 
-		// 检查镜像源是否存在
-		mirrors := mm.ListMirrors()
+		// 检查镜像源是否存在（只检查未删除的）
+		mirrors := mm.ListActiveMirrors()
 		found := false
 		for _, mirror := range mirrors {
 			if mirror.Name == mirrorName {
