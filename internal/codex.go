@@ -325,7 +325,12 @@ func (ccm *CodexConfigManager) writeConfigFile(rawConfig map[string]interface{})
 // 例如: projects map 转换为 [projects."/path"] 节.
 func writeTopLevelMapAsSections(file *os.File, prefix string, m map[string]interface{}) error {
 	for key, value := range m {
-		fullKey := prefix + "." + key
+		// 如果key包含特殊字符，需要用引号包裹
+		quotedKey := key
+		if needsQuoting(key) {
+			quotedKey = `"` + key + `"`
+		}
+		fullKey := prefix + "." + quotedKey
 		if subMap, ok := value.(map[string]interface{}); ok {
 			// 分离嵌套map和简单值
 			nestedMaps := make(map[string]map[string]interface{})
@@ -383,6 +388,22 @@ func writeTopLevelMapAsSections(file *os.File, prefix string, m map[string]inter
 func isMap(value interface{}) bool {
 	_, ok := value.(map[string]interface{})
 	return ok
+}
+
+// needsQuoting 判断TOML键是否需要引号包裹.
+// 如果包含特殊字符（如/、空格等）则需要引号.
+func needsQuoting(key string) bool {
+	// 如果已经有引号，不需要再加
+	if strings.HasPrefix(key, `"`) && strings.HasSuffix(key, `"`) {
+		return false
+	}
+	// 检查是否包含需要引号的字符
+	for _, ch := range key {
+		if ch == '/' || ch == ' ' || ch == '\\' || ch == '-' || ch == '.' {
+			return true
+		}
+	}
+	return false
 }
 
 // writeTOMLMap 将 map[string]interface{} 写入 TOML 文件（标准格式）.
