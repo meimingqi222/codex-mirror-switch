@@ -327,28 +327,48 @@ func writeTopLevelMapAsSections(file *os.File, prefix string, m map[string]inter
 	for key, value := range m {
 		fullKey := prefix + "." + key
 		if subMap, ok := value.(map[string]interface{}); ok {
-			// 检查是否需要继续递归（嵌套结构）
-			hasNestedMap := false
-			for _, v := range subMap {
-				if _, isMap := v.(map[string]interface{}); isMap {
-					hasNestedMap = true
-					break
+			// 分离嵌套map和简单值
+			nestedMaps := make(map[string]map[string]interface{})
+			simpleValues := make(map[string]interface{})
+
+			for k, v := range subMap {
+				if nestedMap, isMap := v.(map[string]interface{}); isMap {
+					nestedMaps[k] = nestedMap
+				} else {
+					simpleValues[k] = v
 				}
 			}
 
-			if hasNestedMap {
-				// 继续递归处理嵌套结构
-				if err := writeTopLevelMapAsSections(file, fullKey, subMap); err != nil {
+			// 写入节头
+			if _, err := fmt.Fprintf(file, "\n[%s]\n", fullKey); err != nil {
+				return err
+			}
+
+			// 先写入简单值
+			for k, v := range simpleValues {
+				if err := writeTOMLValue(file, k, v, "  "); err != nil {
 					return err
 				}
-			} else {
-				// 写入节
-				if _, err := fmt.Fprintf(file, "\n[%s]\n", fullKey); err != nil {
-					return err
-				}
-				// 写入该节的所有值
-				if err := writeTOMLMap(file, subMap, "  "); err != nil {
-					return err
+			}
+
+			// 处理嵌套map：对于env字段使用内联表，其他继续递归
+			for k, nestedMap := range nestedMaps {
+				if k == "env" && shouldUseInlineTable(nestedMap) {
+					// env字段使用内联表格式
+					if _, err := fmt.Fprintf(file, "  env = "); err != nil {
+						return err
+					}
+					if err := writeInlineTable(nestedMap, file); err != nil {
+						return err
+					}
+					if _, err := fmt.Fprintf(file, "\n"); err != nil {
+						return err
+					}
+				} else {
+					// 其他嵌套map递归处理
+					if err := writeTopLevelMapAsSections(file, fullKey, map[string]interface{}{k: nestedMap}); err != nil {
+						return err
+					}
 				}
 			}
 		} else {
@@ -368,7 +388,24 @@ func isMap(value interface{}) bool {
 // writeTOMLMap 将 map[string]interface{} 写入 TOML 文件（标准格式）.
 func writeTOMLMap(file *os.File, m map[string]interface{}, indent string) error {
 	// 标准格式：每个键值对单独一行
+	// 但对于env字段，如果是简单map则使用内联表格式
 	for key, value := range m {
+		// 特殊处理：env字段使用内联表格式
+		if key == "env" {
+			if envMap, ok := value.(map[string]interface{}); ok && shouldUseInlineTable(envMap) {
+				// 使用内联表格式
+				if _, err := fmt.Fprintf(file, "%senv = ", indent); err != nil {
+					return err
+				}
+				if err := writeInlineTable(envMap, file); err != nil {
+					return err
+				}
+				if _, err := fmt.Fprintf(file, "\n"); err != nil {
+					return err
+				}
+				continue
+			}
+		}
 		if err := writeTOMLValue(file, key, value, indent); err != nil {
 			return err
 		}
