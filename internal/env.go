@@ -193,30 +193,23 @@ func cleanupOldCodexEnvVars(lines []string) []string {
 		line := lines[i]
 		trimmed := strings.TrimSpace(line)
 
-		// 检查是否是注释行且下一行是要清理的环境变量
+		// 只清理由本工具写入的标记段落：
+		// 1. 注释行必须是精确的 "# Codex Mirror Switch - API Key" 或带句号版本；
+		// 2. 紧随其后的下一行必须是以 "export CODEX_" 开头且包含 "_API_KEY=" 的环境变量行。
+		// 满足这两个条件时，一并删除注释行和变量行；否则两行都保留。
 		if (trimmed == "# Codex Mirror Switch - API Key" || trimmed == "# Codex Mirror Switch - API Key.") &&
 			i+1 < len(lines) {
 			nextLine := lines[i+1]
 			nextTrimmed := strings.TrimSpace(nextLine)
 
-			// 如果下一行是要清理的环境变量，跳过注释行和环境变量行
-			if shouldCleanupEnvVar(nextTrimmed) {
-				i += 2 // 跳过注释行和环境变量行
-				continue
-			} else {
-				// 如果下一行不是要清理的环境变量，但注释行看起来是孤立的，跳过注释行
-				i += 1
+			if strings.HasPrefix(nextTrimmed, "export CODEX_") && strings.Contains(nextTrimmed, "_API_KEY=") {
+				// 删除该注释行和紧随其后的 CODEX_*_API_KEY 行
+				i += 2
 				continue
 			}
 		}
 
-		// 检查当前行是否是要清理的环境变量
-		if shouldCleanupEnvVar(trimmed) {
-			i += 1 // 跳过环境变量行
-			continue
-		}
-
-		// 保留当前行
+		// 其他行原样保留
 		cleanedLines = append(cleanedLines, line)
 		i++
 	}
@@ -226,16 +219,9 @@ func cleanupOldCodexEnvVars(lines []string) []string {
 
 // shouldCleanupEnvVar 判断是否应该清理该环境变量行.
 func shouldCleanupEnvVar(line string) bool {
-	// 跳过所有 CODEX_*_API_KEY 环境变量（包括 CODEX_SWITCH_API_KEY）
-	if strings.HasPrefix(line, "export CODEX_") && strings.Contains(line, "_API_KEY=") {
-		return true
-	}
-
-	// 跳过 OPENAI_API_KEY 环境变量（避免冲突）
-	if strings.HasPrefix(line, "export OPENAI_API_KEY=") {
-		return true
-	}
-
+	// 保留函数以兼容已有调用，但实际清理逻辑已经移动到 cleanupOldCodexEnvVars 中，
+	// 这里不再进行基于前缀的宽泛删除，始终返回 false。
+	_ = line
 	return false
 }
 

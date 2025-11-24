@@ -258,14 +258,20 @@ func (ccm *CodexConfigManager) updateRawConfigModelProviders(rawConfig map[strin
 
 // writeConfigFile 将配置写入文件（保留所有原始字段）.
 func (ccm *CodexConfigManager) writeConfigFile(rawConfig map[string]interface{}) error {
-	file, err := os.Create(ccm.configPath)
-	if err != nil {
-		return fmt.Errorf("创建配置文件失败: %v", err)
+	// 使用原子写入：先写入临时文件，再通过重命名替换原文件
+	configDir := filepath.Dir(ccm.configPath)
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		return fmt.Errorf("创建配置目录失败: %v", err)
 	}
+
+	tmpFile, err := os.CreateTemp(configDir, "config-*.toml")
+	if err != nil {
+		return fmt.Errorf("创建临时配置文件失败: %v", err)
+	}
+	tmpPath := tmpFile.Name()
+
 	defer func() {
-		if err := file.Close(); err != nil {
-			fmt.Printf("警告: 关闭配置文件失败: %v\n", err)
-		}
+		_ = os.Remove(tmpPath)
 	}()
 
 	// 分离不同类型的键
@@ -287,7 +293,7 @@ func (ccm *CodexConfigManager) writeConfigFile(rawConfig map[string]interface{})
 	// 1. 写入基本配置项（不包含点的简单值）
 	for key, value := range rawConfig {
 		if basicKeys[key] {
-			if err := writeTOMLValue(file, key, value, ""); err != nil {
+			if err := writeTOMLValue(tmpFile, key, value, ""); err != nil {
 				return err
 			}
 		}
@@ -297,10 +303,10 @@ func (ccm *CodexConfigManager) writeConfigFile(rawConfig map[string]interface{})
 	for key, value := range rawConfig {
 		if dottedKeys[key] {
 			if subMap, ok := value.(map[string]interface{}); ok {
-				if _, err := fmt.Fprintf(file, "\n[%s]\n", key); err != nil {
+				if _, err := fmt.Fprintf(tmpFile, "\n[%s]\n", key); err != nil {
 					return err
 				}
-				if err := writeTOMLMap(file, subMap, "  "); err != nil {
+				if err := writeTOMLMap(tmpFile, subMap, "  "); err != nil {
 					return err
 				}
 			}
@@ -311,11 +317,27 @@ func (ccm *CodexConfigManager) writeConfigFile(rawConfig map[string]interface{})
 	for key, value := range rawConfig {
 		if topLevelMaps[key] {
 			if subMap, ok := value.(map[string]interface{}); ok {
-				if err := writeTopLevelMapAsSections(file, key, subMap); err != nil {
+				if err := writeTopLevelMapAsSections(tmpFile, key, subMap); err != nil {
 					return err
 				}
 			}
 		}
+	}
+
+	// 将数据刷入磁盘
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("同步临时配置文件失败: %v", err)
+	}
+
+	// 关闭临时文件句柄，避免在 Windows 上影响重命名
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("关闭临时配置文件失败: %v", err)
+	}
+
+	// 原子替换目标文件
+	if err := os.Rename(tmpPath, ccm.configPath); err != nil {
+		return fmt.Errorf("替换配置文件失败: %v", err)
 	}
 
 	return nil
@@ -604,21 +626,39 @@ func (ccm *CodexConfigManager) UpdateAuth(mirror *MirrorConfig) error {
 		APIKey: mirror.APIKey,
 	}
 
-	// 创建或更新auth.json文件
-	file, err := os.Create(ccm.authPath)
-	if err != nil {
-		return fmt.Errorf("创建认证文件失败: %v", err)
+	// 使用原子写入 auth.json：写入临时文件后重命名
+	authDir := filepath.Dir(ccm.authPath)
+	if err := os.MkdirAll(authDir, 0o755); err != nil {
+		return fmt.Errorf("创建认证目录失败: %v", err)
 	}
+
+	tmpFile, err := os.CreateTemp(authDir, "auth-*.json")
+	if err != nil {
+		return fmt.Errorf("创建临时认证文件失败: %v", err)
+	}
+	tmpPath := tmpFile.Name()
 	defer func() {
-		if err := file.Close(); err != nil {
-			fmt.Printf("警告: 关闭认证文件失败: %v\n", err)
-		}
+		_ = os.Remove(tmpPath)
 	}()
 
-	encoder := json.NewEncoder(file)
+	encoder := json.NewEncoder(tmpFile)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(auth); err != nil {
-		return fmt.Errorf("写入认证文件失败: %v", err)
+		_ = tmpFile.Close()
+		return fmt.Errorf("写入临时认证文件失败: %v", err)
+	}
+
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("同步临时认证文件失败: %v", err)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("关闭临时认证文件失败: %v", err)
+	}
+
+	if err := os.Rename(tmpPath, ccm.authPath); err != nil {
+		return fmt.Errorf("替换认证文件失败: %v", err)
 	}
 
 	return nil
@@ -797,26 +837,38 @@ func (ccm *CodexConfigManager) BackupConfig() error {
 // copyFile 复制文件.
 // saveConfig 保存配置到文件.
 func (ccm *CodexConfigManager) saveConfig(config *CodexConfig) error {
-	// 确保目录存在
-	if err := os.MkdirAll(filepath.Dir(ccm.configPath), 0o755); err != nil {
+	// 使用原子写入：先写入临时文件，再通过重命名替换原文件
+	configDir := filepath.Dir(ccm.configPath)
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		return fmt.Errorf("创建配置目录失败: %v", err)
 	}
 
-	// 直接写入配置文件
-	file, err := os.Create(ccm.configPath)
+	tmpFile, err := os.CreateTemp(configDir, "config-*.toml")
 	if err != nil {
-		return fmt.Errorf("创建配置文件失败: %v", err)
+		return fmt.Errorf("创建临时配置文件失败: %v", err)
 	}
+	tmpPath := tmpFile.Name()
 	defer func() {
-		if closeErr := file.Close(); closeErr != nil {
-			fmt.Printf("警告: 关闭配置文件失败: %v\n", closeErr)
-		}
+		_ = os.Remove(tmpPath)
 	}()
 
-	// 编码并写入配置
-	encoder := toml.NewEncoder(file)
+	encoder := toml.NewEncoder(tmpFile)
 	if err := encoder.Encode(config); err != nil {
+		_ = tmpFile.Close()
 		return fmt.Errorf("编码配置失败: %v", err)
+	}
+
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("同步临时配置文件失败: %v", err)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("关闭临时配置文件失败: %v", err)
+	}
+
+	if err := os.Rename(tmpPath, ccm.configPath); err != nil {
+		return fmt.Errorf("替换配置文件失败: %v", err)
 	}
 
 	return nil

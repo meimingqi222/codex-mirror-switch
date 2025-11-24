@@ -67,17 +67,46 @@ func (mm *MirrorManager) loadConfig() error {
 
 // saveConfig 保存配置文件.
 func (mm *MirrorManager) saveConfig() error {
-	file, err := os.Create(mm.configPath)
-	if err != nil {
-		return err
+	// 使用原子写入：先写入临时文件，再通过重命名替换原文件
+	dir := filepath.Dir(mm.configPath)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("创建配置目录失败: %v", err)
 	}
+
+	tmpFile, err := os.CreateTemp(dir, "mirrors-*.toml")
+	if err != nil {
+		return fmt.Errorf("创建临时配置文件失败: %v", err)
+	}
+	tmpPath := tmpFile.Name()
+
+	// 结束时尝试删除临时文件（如果已经被重命名则会失败，忽略该错误）
 	defer func() {
-		if err := file.Close(); err != nil {
-			fmt.Printf("警告: 关闭配置文件失败: %v\n", err)
-		}
+		_ = os.Remove(tmpPath)
 	}()
 
-	return toml.NewEncoder(file).Encode(mm.config)
+	// 写入配置到临时文件
+	if err := toml.NewEncoder(tmpFile).Encode(mm.config); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("写入临时配置文件失败: %v", err)
+	}
+
+	// 确保内容刷入磁盘
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("同步临时配置文件失败: %v", err)
+	}
+
+	// 关闭临时文件句柄，避免在 Windows 上影响重命名
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("关闭临时配置文件失败: %v", err)
+	}
+
+	// 使用重命名原子替换目标文件
+	if err := os.Rename(tmpPath, mm.configPath); err != nil {
+		return fmt.Errorf("替换配置文件失败: %v", err)
+	}
+
+	return nil
 }
 
 // SaveConfig 保存配置文件（公开方法）.
