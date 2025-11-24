@@ -20,6 +20,7 @@ func TestNewVSCodeConfigManager(t *testing.T) {
 
 	if vcm == nil {
 		t.Fatal("VSCodeConfigManager should not be nil")
+		return
 	}
 
 	// 验证设置路径

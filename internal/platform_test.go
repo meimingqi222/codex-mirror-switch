@@ -54,6 +54,7 @@ func TestGetPathConfig(t *testing.T) {
 
 	if config == nil {
 		t.Fatal("PathConfig is nil")
+		return
 	}
 
 	// 检查基本字段

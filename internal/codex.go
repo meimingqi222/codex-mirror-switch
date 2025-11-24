@@ -87,7 +87,7 @@ func (ccm *CodexConfigManager) UpdateConfig(mirror *MirrorConfig) error {
 	}
 
 	providerConfig := ccm.createProviderConfig(mirror, config)
-	ccm.updateConfigStructures(config, rawConfig, mirror.Name, providerConfig)
+	ccm.updateConfigStructures(config, rawConfig, mirror, providerConfig)
 
 	return ccm.writeConfigFile(rawConfig)
 }
@@ -167,7 +167,7 @@ func (ccm *CodexConfigManager) mergeExistingProviderConfig(providerConfig *Model
 }
 
 // updateConfigStructures 更新配置结构体和原始配置.
-func (ccm *CodexConfigManager) updateConfigStructures(config *CodexConfig, rawConfig map[string]interface{}, mirrorName string, providerConfig ModelProviderConfig) {
+func (ccm *CodexConfigManager) updateConfigStructures(config *CodexConfig, rawConfig map[string]interface{}, mirror *MirrorConfig, providerConfig ModelProviderConfig) {
 	// 更新 config 结构体中的 ModelProviders
 	if config.ModelProviders == nil {
 		config.ModelProviders = make(map[string]ModelProviderConfig)
@@ -180,22 +180,26 @@ func (ccm *CodexConfigManager) updateConfigStructures(config *CodexConfig, rawCo
 	}
 
 	// 添加或更新当前镜像的配置
-	config.ModelProviders[mirrorName] = providerConfig
+	config.ModelProviders[mirror.Name] = providerConfig
 
 	if rawConfig == nil {
 		rawConfig = make(map[string]interface{})
 	}
 
-	ccm.updateRawConfigBasicFields(rawConfig, config, mirrorName)
-	ccm.updateRawConfigModelProviders(rawConfig, mirrorName, providerConfig, existingProviders)
+	ccm.updateRawConfigBasicFields(rawConfig, config, mirror)
+	ccm.updateRawConfigModelProviders(rawConfig, mirror.Name, providerConfig, existingProviders)
 }
 
 // updateRawConfigBasicFields 更新原始配置中的基础字段.
-func (ccm *CodexConfigManager) updateRawConfigBasicFields(rawConfig map[string]interface{}, config *CodexConfig, mirrorName string) {
-	rawConfig["model_provider"] = mirrorName
+func (ccm *CodexConfigManager) updateRawConfigBasicFields(rawConfig map[string]interface{}, config *CodexConfig, mirror *MirrorConfig) {
+	rawConfig["model_provider"] = mirror.Name
 
-	// 更新 Model 字段 - 测试期望总是更新为 gpt-5
-	config.Model = TestModelGPT5
+	// 更新 Model 字段 - 使用 mirror 中的 ModelName，如果没有则使用默认值
+	if mirror.ModelName != "" {
+		config.Model = mirror.ModelName
+	} else {
+		config.Model = TestModelGPT5
+	}
 	rawConfig["model"] = config.Model
 
 	// 更新 ModelReasoningEffort 字段

@@ -22,6 +22,7 @@ func TestNewCodexConfigManager(t *testing.T) {
 
 	if ccm == nil {
 		t.Fatal("CodexConfigManager should not be nil")
+		return
 	}
 
 	// 验证路径设置

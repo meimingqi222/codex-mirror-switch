@@ -79,6 +79,7 @@ func TestNewSyncManager(t *testing.T) {
 	sm := NewSyncManager(mm)
 	if sm == nil {
 		t.Fatal("SyncManager should not be nil")
+		return
 	}
 
 	if sm.mirrorManager != mm {
