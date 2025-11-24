@@ -293,7 +293,7 @@ func (ccm *CodexConfigManager) writeConfigFile(rawConfig map[string]interface{})
 		}
 	}
 
-	// 2. 写入带点的节（如 [model_providers.provider_name]）
+	// 2. 写入带点的节（保留所有原始的带点的键）
 	for key, value := range rawConfig {
 		if dottedKeys[key] {
 			if subMap, ok := value.(map[string]interface{}); ok {
@@ -307,7 +307,7 @@ func (ccm *CodexConfigManager) writeConfigFile(rawConfig map[string]interface{})
 		}
 	}
 
-	// 3. 写入顶级map（如 [projects.xxx], [mcp.xxx]）
+	// 3. 写入顶级map
 	for key, value := range rawConfig {
 		if topLevelMaps[key] {
 			if subMap, ok := value.(map[string]interface{}); ok {
@@ -365,14 +365,77 @@ func isMap(value interface{}) bool {
 	return ok
 }
 
-// writeTOMLMap 将 map[string]interface{} 写入 TOML 文件.
+// writeTOMLMap 将 map[string]interface{} 写入 TOML 文件（标准格式）.
 func writeTOMLMap(file *os.File, m map[string]interface{}, indent string) error {
+	// 标准格式：每个键值对单独一行
 	for key, value := range m {
 		if err := writeTOMLValue(file, key, value, indent); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// shouldUseInlineTable 判断是否应该使用内联表格式.
+func shouldUseInlineTable(m map[string]interface{}) bool {
+	// 如果map只包含简单类型（字符串、数字、布尔值、数组），使用内联表
+	for _, value := range m {
+		switch value.(type) {
+		case string, int, int32, int64, float32, float64, bool, []interface{}:
+			// 简单类型，适合内联表
+			continue
+		case map[string]interface{}:
+			// 嵌套map，不适合内联表
+			return false
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// writeInlineTableValue 写入内联表的值.
+func writeInlineTableValue(file *os.File, key string, value interface{}) error {
+	switch v := value.(type) {
+	case string:
+		_, err := fmt.Fprintf(file, "%s = %q", key, v)
+		return err
+	case bool:
+		_, err := fmt.Fprintf(file, "%s = %t", key, v)
+		return err
+	case int, int32, int64:
+		_, err := fmt.Fprintf(file, "%s = %d", key, v)
+		return err
+	case float32, float64:
+		_, err := fmt.Fprintf(file, "%s = %f", key, v)
+		return err
+	case []interface{}:
+		// 内联数组
+		if _, err := fmt.Fprintf(file, "%s = [", key); err != nil {
+			return err
+		}
+		for i, item := range v {
+			if i > 0 {
+				if _, err := fmt.Fprintf(file, ", "); err != nil {
+					return err
+				}
+			}
+			if s, ok := item.(string); ok {
+				if _, err := fmt.Fprintf(file, "%q", s); err != nil {
+					return err
+				}
+			} else {
+				if _, err := fmt.Fprintf(file, "%v", item); err != nil {
+					return err
+				}
+			}
+		}
+		_, err := fmt.Fprintf(file, "]")
+		return err
+	default:
+		_, err := fmt.Fprintf(file, "%s = %v", key, v)
+		return err
+	}
 }
 
 // writeTOMLValue 将单个键值对写入 TOML 文件.
@@ -399,10 +462,82 @@ func writeTOMLValue(file *os.File, key string, value interface{}, indent string)
 	case float64:
 		_, err := fmt.Fprintf(file, "%s%s = %f\n", indent, key, v)
 		return err
+	case []interface{}:
+		// 处理数组
+		return writeTOMLArray(file, key, v, indent)
+	case map[string]interface{}:
+		// map 值：检查是否应该使用内联表
+		if shouldUseInlineTable(v) {
+			// 内联表格式：key = { field1 = val1, field2 = val2 }
+			if _, err := fmt.Fprintf(file, "%s%s = ", indent, key); err != nil {
+				return err
+			}
+			if err := writeInlineTable(v, file); err != nil {
+				return err
+			}
+			_, err := fmt.Fprintf(file, "\n")
+			return err
+		}
+		// 复杂map，不应该直接作为值
+		return fmt.Errorf("复杂map值不支持直接写入: %s", key)
 	default:
 		_, err := fmt.Fprintf(file, "%s%s = %v\n", indent, key, v)
 		return err
 	}
+}
+
+// writeInlineTable 写入内联表格式: { key1 = val1, key2 = val2 }.
+func writeInlineTable(m map[string]interface{}, file *os.File) error {
+	if _, err := fmt.Fprintf(file, "{"); err != nil {
+		return err
+	}
+	first := true
+	for key, value := range m {
+		if !first {
+			if _, err := fmt.Fprintf(file, ", "); err != nil {
+				return err
+			}
+		}
+		first = false
+		if err := writeInlineTableValue(file, key, value); err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprintf(file, "}")
+	return err
+}
+
+// writeTOMLArray 将数组写入 TOML 格式.
+func writeTOMLArray(file *os.File, key string, arr []interface{}, indent string) error {
+	if _, err := fmt.Fprintf(file, "%s%s = [", indent, key); err != nil {
+		return err
+	}
+
+	for i, value := range arr {
+		if i > 0 {
+			if _, err := fmt.Fprintf(file, ", "); err != nil {
+				return err
+			}
+		}
+
+		switch v := value.(type) {
+		case string:
+			if _, err := fmt.Fprintf(file, "%q", v); err != nil {
+				return err
+			}
+		case int, int32, int64, float32, float64, bool:
+			if _, err := fmt.Fprintf(file, "%v", v); err != nil {
+				return err
+			}
+		default:
+			if _, err := fmt.Fprintf(file, "%v", v); err != nil {
+				return err
+			}
+		}
+	}
+
+	_, err := fmt.Fprintf(file, "]\n")
+	return err
 }
 
 // UpdateAuth 更新Codex认证文件.
