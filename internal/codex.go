@@ -256,7 +256,7 @@ func (ccm *CodexConfigManager) updateRawConfigModelProviders(rawConfig map[strin
 	}
 }
 
-// writeConfigFile 将配置写入文件.
+// writeConfigFile 将配置写入文件（保留所有原始字段）.
 func (ccm *CodexConfigManager) writeConfigFile(rawConfig map[string]interface{}) error {
 	file, err := os.Create(ccm.configPath)
 	if err != nil {
@@ -268,19 +268,34 @@ func (ccm *CodexConfigManager) writeConfigFile(rawConfig map[string]interface{})
 		}
 	}()
 
-	// 首先写入基本配置项（不包含点的键值对）
-	basicKeys := []string{"model_provider", "model", "model_reasoning_effort", "disable_response_storage"}
-	for _, key := range basicKeys {
-		if value, exists := rawConfig[key]; exists && !isMap(value) {
+	// 分离不同类型的键
+	basicKeys := make(map[string]bool)    // 不包含点的简单键
+	dottedKeys := make(map[string]bool)   // 包含点的键（如 model_providers.xxx）
+	topLevelMaps := make(map[string]bool) // 顶级map键（如 projects, mcp）
+
+	for key, value := range rawConfig {
+		switch {
+		case strings.Contains(key, "."):
+			dottedKeys[key] = true
+		case isMap(value):
+			topLevelMaps[key] = true
+		default:
+			basicKeys[key] = true
+		}
+	}
+
+	// 1. 写入基本配置项（不包含点的简单值）
+	for key, value := range rawConfig {
+		if basicKeys[key] {
 			if err := writeTOMLValue(file, key, value, ""); err != nil {
 				return err
 			}
 		}
 	}
 
-	// 然后写入带点的节（如 [model_providers.provider_name]）
+	// 2. 写入带点的节（如 [model_providers.provider_name]）
 	for key, value := range rawConfig {
-		if strings.Contains(key, ".") {
+		if dottedKeys[key] {
 			if subMap, ok := value.(map[string]interface{}); ok {
 				if _, err := fmt.Fprintf(file, "\n[%s]\n", key); err != nil {
 					return err
@@ -292,6 +307,55 @@ func (ccm *CodexConfigManager) writeConfigFile(rawConfig map[string]interface{})
 		}
 	}
 
+	// 3. 写入顶级map（如 [projects.xxx], [mcp.xxx]）
+	for key, value := range rawConfig {
+		if topLevelMaps[key] {
+			if subMap, ok := value.(map[string]interface{}); ok {
+				if err := writeTopLevelMapAsSections(file, key, subMap); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// writeTopLevelMapAsSections 将顶级map写入为带点的节.
+// 例如: projects map 转换为 [projects."/path"] 节.
+func writeTopLevelMapAsSections(file *os.File, prefix string, m map[string]interface{}) error {
+	for key, value := range m {
+		fullKey := prefix + "." + key
+		if subMap, ok := value.(map[string]interface{}); ok {
+			// 检查是否需要继续递归（嵌套结构）
+			hasNestedMap := false
+			for _, v := range subMap {
+				if _, isMap := v.(map[string]interface{}); isMap {
+					hasNestedMap = true
+					break
+				}
+			}
+
+			if hasNestedMap {
+				// 继续递归处理嵌套结构
+				if err := writeTopLevelMapAsSections(file, fullKey, subMap); err != nil {
+					return err
+				}
+			} else {
+				// 写入节
+				if _, err := fmt.Fprintf(file, "\n[%s]\n", fullKey); err != nil {
+					return err
+				}
+				// 写入该节的所有值
+				if err := writeTOMLMap(file, subMap, "  "); err != nil {
+					return err
+				}
+			}
+		} else {
+			// 不应该发生，跳过
+			continue
+		}
+	}
 	return nil
 }
 
