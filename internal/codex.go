@@ -268,10 +268,34 @@ func (ccm *CodexConfigManager) writeConfigFile(rawConfig map[string]interface{})
 		}
 	}()
 
+	// 分类并写入配置
+	return ccm.writeConfigSections(file, rawConfig)
+}
+
+// writeConfigSections 分类并写入配置的各个部分.
+func (ccm *CodexConfigManager) writeConfigSections(file *os.File, rawConfig map[string]interface{}) error {
 	// 分离不同类型的键
-	basicKeys := make(map[string]bool)    // 不包含点的简单键
-	dottedKeys := make(map[string]bool)   // 包含点的键（如 model_providers.xxx）
-	topLevelMaps := make(map[string]bool) // 顶级map键（如 projects, mcp）
+	basicKeys, dottedKeys, topLevelMaps := classifyConfigKeys(rawConfig)
+
+	// 1. 写入基本配置项
+	if err := writeBasicKeys(file, rawConfig, basicKeys); err != nil {
+		return err
+	}
+
+	// 2. 写入带点的节
+	if err := ccm.writeDottedKeys(file, rawConfig, dottedKeys); err != nil {
+		return err
+	}
+
+	// 3. 写入顶级map
+	return writeTopLevelMaps(file, rawConfig, topLevelMaps)
+}
+
+// classifyConfigKeys 将配置键分类为不同类型.
+func classifyConfigKeys(rawConfig map[string]interface{}) (basicKeys, dottedKeys, topLevelMaps map[string]bool) {
+	basicKeys = make(map[string]bool)
+	dottedKeys = make(map[string]bool)
+	topLevelMaps = make(map[string]bool)
 
 	for key, value := range rawConfig {
 		switch {
@@ -283,8 +307,11 @@ func (ccm *CodexConfigManager) writeConfigFile(rawConfig map[string]interface{})
 			basicKeys[key] = true
 		}
 	}
+	return
+}
 
-	// 1. 写入基本配置项（不包含点的简单值）
+// writeBasicKeys 写入基本配置项（不包含点的简单值）.
+func writeBasicKeys(file *os.File, rawConfig map[string]interface{}, basicKeys map[string]bool) error {
 	for key, value := range rawConfig {
 		if basicKeys[key] {
 			if err := writeTOMLValue(file, key, value, ""); err != nil {
@@ -292,22 +319,64 @@ func (ccm *CodexConfigManager) writeConfigFile(rawConfig map[string]interface{})
 			}
 		}
 	}
+	return nil
+}
 
-	// 2. 写入带点的节（保留所有原始的带点的键）
+// writeDottedKeys 写入带点的节（保留所有原始的带点的键）.
+func (ccm *CodexConfigManager) writeDottedKeys(file *os.File, rawConfig map[string]interface{}, dottedKeys map[string]bool) error {
 	for key, value := range rawConfig {
 		if dottedKeys[key] {
 			if subMap, ok := value.(map[string]interface{}); ok {
-				if _, err := fmt.Fprintf(file, "\n[%s]\n", key); err != nil {
-					return err
-				}
-				if err := writeTOMLMap(file, subMap, "  "); err != nil {
+				if err := writeDottedSection(file, key, subMap); err != nil {
 					return err
 				}
 			}
 		}
 	}
+	return nil
+}
 
-	// 3. 写入顶级map
+// writeDottedSection 写入一个带点的节，处理其简单值和嵌套map.
+func writeDottedSection(file *os.File, key string, subMap map[string]interface{}) error {
+	// 分离嵌套map和简单值
+	nestedMaps := make(map[string]map[string]interface{})
+	simpleValues := make(map[string]interface{})
+
+	for k, v := range subMap {
+		if nestedMap, isMap := v.(map[string]interface{}); isMap {
+			nestedMaps[k] = nestedMap
+		} else {
+			simpleValues[k] = v
+		}
+	}
+
+	// 先写入当前节的简单值（如果有）
+	if len(simpleValues) > 0 {
+		if _, err := fmt.Fprintf(file, "\n[%s]\n", key); err != nil {
+			return err
+		}
+		for k, v := range simpleValues {
+			if err := writeTOMLValue(file, k, v, "  "); err != nil {
+				return err
+			}
+		}
+	}
+
+	// 递归处理嵌套的map（作为独立的节）
+	for k, nestedMap := range nestedMaps {
+		nestedKey := key + "." + k
+		if _, err := fmt.Fprintf(file, "\n[%s]\n", nestedKey); err != nil {
+			return err
+		}
+		if err := writeTOMLMap(file, nestedMap, "  "); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// writeTopLevelMaps 写入顶级map.
+func writeTopLevelMaps(file *os.File, rawConfig map[string]interface{}, topLevelMaps map[string]bool) error {
 	for key, value := range rawConfig {
 		if topLevelMaps[key] {
 			if subMap, ok := value.(map[string]interface{}); ok {
@@ -317,7 +386,6 @@ func (ccm *CodexConfigManager) writeConfigFile(rawConfig map[string]interface{})
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -327,28 +395,66 @@ func writeTopLevelMapAsSections(file *os.File, prefix string, m map[string]inter
 	for key, value := range m {
 		fullKey := prefix + "." + key
 		if subMap, ok := value.(map[string]interface{}); ok {
-			// 检查是否需要继续递归（嵌套结构）
-			hasNestedMap := false
-			for _, v := range subMap {
-				if _, isMap := v.(map[string]interface{}); isMap {
-					hasNestedMap = true
-					break
+			// 分离嵌套map和简单值
+			nestedMaps := make(map[string]map[string]interface{})
+			simpleValues := make(map[string]interface{})
+
+			for k, v := range subMap {
+				if nestedMap, isMap := v.(map[string]interface{}); isMap {
+					nestedMaps[k] = nestedMap
+				} else {
+					simpleValues[k] = v
 				}
 			}
 
-			if hasNestedMap {
-				// 继续递归处理嵌套结构
-				if err := writeTopLevelMapAsSections(file, fullKey, subMap); err != nil {
-					return err
-				}
-			} else {
-				// 写入节
+			// 先写入当前节的简单值（如果有）
+			if len(simpleValues) > 0 {
 				if _, err := fmt.Fprintf(file, "\n[%s]\n", fullKey); err != nil {
 					return err
 				}
-				// 写入该节的所有值
-				if err := writeTOMLMap(file, subMap, "  "); err != nil {
+				// 只写入简单值，不包括嵌套map
+				for k, v := range simpleValues {
+					if err := writeTOMLValue(file, k, v, "  "); err != nil {
+						return err
+					}
+				}
+			}
+
+			// 递归处理嵌套的map（作为独立的节）
+			for k, nestedMap := range nestedMaps {
+				nestedKey := fullKey + "." + k
+
+				// 再次分离嵌套map中的简单值和嵌套map
+				nestedNestedMaps := make(map[string]map[string]interface{})
+				nestedSimpleValues := make(map[string]interface{})
+
+				for nk, nv := range nestedMap {
+					if nnMap, isMap := nv.(map[string]interface{}); isMap {
+						nestedNestedMaps[nk] = nnMap
+					} else {
+						nestedSimpleValues[nk] = nv
+					}
+				}
+
+				// 写入嵌套节的简单值
+				if _, err := fmt.Fprintf(file, "\n[%s]\n", nestedKey); err != nil {
 					return err
+				}
+				for nk, nv := range nestedSimpleValues {
+					if err := writeTOMLValue(file, nk, nv, "  "); err != nil {
+						return err
+					}
+				}
+
+				// 递归处理更深层的嵌套
+				for nnk, nnMap := range nestedNestedMaps {
+					deepKey := nestedKey + "." + nnk
+					if _, err := fmt.Fprintf(file, "\n[%s]\n", deepKey); err != nil {
+						return err
+					}
+					if err := writeTOMLMap(file, nnMap, "  "); err != nil {
+						return err
+					}
 				}
 			}
 		} else {
@@ -368,7 +474,12 @@ func isMap(value interface{}) bool {
 // writeTOMLMap 将 map[string]interface{} 写入 TOML 文件（标准格式）.
 func writeTOMLMap(file *os.File, m map[string]interface{}, indent string) error {
 	// 标准格式：每个键值对单独一行
+	// 跳过map类型的值，这些应该由调用者处理为独立的节
 	for key, value := range m {
+		if _, isMap := value.(map[string]interface{}); isMap {
+			// 跳过map类型，让调用者处理为独立节
+			continue
+		}
 		if err := writeTOMLValue(file, key, value, indent); err != nil {
 			return err
 		}
