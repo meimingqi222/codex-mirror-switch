@@ -374,16 +374,52 @@ func (mm *MirrorManager) SwitchMirror(name string) error {
 
 // UpdateMirror 更新镜像源.
 func (mm *MirrorManager) UpdateMirror(name, baseURL, apiKey string) error {
+	return mm.UpdateMirrorFull(name, baseURL, apiKey, "", "")
+}
+
+// UpdateMirrorFull 完整更新镜像源（支持所有字段）.
+func (mm *MirrorManager) UpdateMirrorFull(name, baseURL, apiKey, modelName, toolType string) error {
 	for i := range mm.config.Mirrors {
 		mirror := &mm.config.Mirrors[i]
 		if mirror.Name == name {
+			if mirror.Deleted {
+				return fmt.Errorf("镜像源 '%s' 已被删除", name)
+			}
+
+			updated := false
+
 			if baseURL != "" {
 				mirror.BaseURL = baseURL
+				updated = true
 			}
 			if apiKey != "" {
 				mirror.APIKey = apiKey
+				updated = true
 			}
-			return mm.saveConfig()
+			if modelName != "" {
+				mirror.ModelName = modelName
+				updated = true
+			}
+			if toolType != "" {
+				switch toolType {
+				case "codex":
+					mirror.ToolType = ToolTypeCodex
+					mirror.EnvKey = CodexSwitchAPIKeyEnv
+				case "claude":
+					mirror.ToolType = ToolTypeClaude
+					mirror.EnvKey = AnthropicAuthTokenEnv
+				default:
+					return fmt.Errorf("无效的工具类型 '%s'，支持: codex, claude", toolType)
+				}
+				updated = true
+			}
+
+			if updated {
+				mirror.LastModified = time.Now()
+				return mm.saveConfig()
+			}
+
+			return nil // 没有任何更新
 		}
 	}
 
@@ -677,6 +713,40 @@ func SanitizeEnvVarName(name string) string {
 	}
 
 	return strings.ToUpper(sanitized)
+}
+
+// ValidateBaseURL 验证 API 基础 URL 格式.
+func ValidateBaseURL(baseURL string) error {
+	if baseURL == "" {
+		return fmt.Errorf("URL 不能为空")
+	}
+
+	// 解析 URL
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return fmt.Errorf("URL 格式无效: %v", err)
+	}
+
+	// 检查 scheme
+	if u.Scheme == "" {
+		return fmt.Errorf("URL 缺少协议 (http:// 或 https://)，当前: %s", baseURL)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("URL 协议必须是 http 或 https，当前: %s", u.Scheme)
+	}
+
+	// 检查 host
+	if u.Host == "" {
+		return fmt.Errorf("URL 缺少主机名")
+	}
+
+	// 检查是否有路径但不是以 / 结尾的基础路径
+	// API 基础 URL 通常不应该有查询参数
+	if u.RawQuery != "" {
+		return fmt.Errorf("API 基础 URL 不应包含查询参数")
+	}
+
+	return nil
 }
 
 // extractMirrorNameFromURL 从 URL 中提取镜像源名称.

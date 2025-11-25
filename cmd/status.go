@@ -20,13 +20,11 @@ var statusCmd = &cobra.Command{
 
 示例：
   codex-mirror status`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// 创建镜像源管理器
 		mm, err := internal.NewMirrorManager()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
-			os.Exit(1)
-			return
+			return fmt.Errorf("初始化失败: %w", err)
 		}
 
 		fmt.Println("当前配置状态:")
@@ -45,6 +43,8 @@ var statusCmd = &cobra.Command{
 		// 检查VS Code配置状态
 		fmt.Println("VS Code配置:")
 		checkVSCodeStatus(mm)
+
+		return nil
 	},
 }
 

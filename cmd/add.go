@@ -42,10 +42,15 @@ func runAddCommand(cmd *cobra.Command, args []string) error {
 		apiKey = args[2]
 	}
 
+	// 验证 URL 格式
+	if err := internal.ValidateBaseURL(baseURL); err != nil {
+		return fmt.Errorf("无效的 API 地址: %v", err)
+	}
+
 	// 获取工具类型
 	toolType, _ := cmd.Flags().GetString("type")
 	if toolType == "" {
-		toolType = "codex" // 默认为 codex
+		toolType = string(internal.ToolTypeCodex) // 默认为 codex
 	}
 
 	// 获取模型名称
@@ -54,12 +59,12 @@ func runAddCommand(cmd *cobra.Command, args []string) error {
 	// 验证工具类型
 	var internalToolType internal.ToolType
 	switch toolType {
-	case "codex":
+	case string(internal.ToolTypeCodex):
 		internalToolType = internal.ToolTypeCodex
-	case "claude":
+	case string(internal.ToolTypeClaude):
 		internalToolType = internal.ToolTypeClaude
 	default:
-		return fmt.Errorf("无效的工具类型 '%s'，支持: codex, claude", toolType)
+		return fmt.Errorf("无效的工具类型 '%s'，支持: %s, %s", toolType, internal.ToolTypeCodex, internal.ToolTypeClaude)
 	}
 
 	// 创建镜像源管理器

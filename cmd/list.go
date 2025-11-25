@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"codex-mirror/internal"
@@ -18,13 +17,11 @@ var listCmd = &cobra.Command{
 
 示例：
   codex-mirror list`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// 创建镜像源管理器
 		mm, err := internal.NewMirrorManager()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "错误: %v\n", err)
-			os.Exit(1)
-			return
+			return fmt.Errorf("初始化失败: %w", err)
 		}
 
 		// 获取过滤器类型
@@ -46,7 +43,7 @@ var listCmd = &cobra.Command{
 
 		if len(mirrors) == 0 {
 			fmt.Println("没有配置任何镜像源")
-			return
+			return nil
 		}
 
 		// 获取当前激活的配置
@@ -95,6 +92,8 @@ var listCmd = &cobra.Command{
 		} else {
 			fmt.Printf("  Claude: 未设置\n")
 		}
+
+		return nil
 	},
 }
 

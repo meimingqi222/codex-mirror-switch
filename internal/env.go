@@ -217,14 +217,6 @@ func cleanupOldCodexEnvVars(lines []string) []string {
 	return cleanedLines
 }
 
-// shouldCleanupEnvVar 判断是否应该清理该环境变量行.
-func shouldCleanupEnvVar(line string) bool {
-	// 保留函数以兼容已有调用，但实际清理逻辑已经移动到 cleanupOldCodexEnvVars 中，
-	// 这里不再进行基于前缀的宽泛删除，始终返回 false。
-	_ = line
-	return false
-}
-
 // cleanupExtraLines 清理多余的空行和连续的注释.
 func cleanupExtraLines(lines []string) []string {
 	var cleanedLines []string
@@ -264,21 +256,26 @@ func CleanupOldCodexEnvVars(lines []string) []string {
 
 // unsetEnvironmentVariable 清除环境变量(适用于可选变量).
 func (em *EnvManager) unsetEnvironmentVariable(envKey string) {
-	// 从OSS进程中移除环境变量
+	// 从当前进程中移除环境变量
 	_ = os.Unsetenv(envKey)
 
-	// 从配置文件中移除环境变量定义
+	// 从持久化存储中移除环境变量定义
 	platform := GetCurrentPlatform()
 
 	switch platform {
 	case PlatformWindows:
-		// Windows 上使用 setx 清除环境变量
-		cmd := exec.Command("setx", envKey, "")
+		// Windows 上使用 reg delete 从注册表删除用户环境变量
+		// setx 设置空字符串不等于删除，必须使用 reg delete
+		cmd := exec.Command("reg", "delete", "HKCU\\Environment", "/v", envKey, "/f")
 		output, err := cmd.CombinedOutput()
 		if err != nil {
-			fmt.Printf("警告: 清除环境变量 %s 失败: %v, 输出: %s\n", envKey, err, string(output))
+			// 如果变量不存在，reg delete 会返回错误，这是预期行为
+			if !strings.Contains(string(output), "找不到") && !strings.Contains(string(output), "not found") {
+				fmt.Printf("警告: 清除环境变量 %s 失败: %v\n", envKey, err)
+			}
 		} else {
 			fmt.Printf("[OK] 环境变量 %s 已清除\n", envKey)
+			// 通知系统环境变量已更改（可选，需要广播 WM_SETTINGCHANGE）
 		}
 		return
 	case PlatformMac:

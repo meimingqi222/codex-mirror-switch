@@ -56,22 +56,47 @@ func (vcm *VSCodeConfigManager) LoadSettings() (map[string]interface{}, error) {
 	return settings, nil
 }
 
-// SaveSettings 保存VS Code设置.
+// SaveSettings 保存VS Code设置（使用原子写入）.
 func (vcm *VSCodeConfigManager) SaveSettings(settings map[string]interface{}) error {
-	file, err := os.Create(vcm.settingsPath)
-	if err != nil {
-		return fmt.Errorf("创建VS Code设置文件失败: %v", err)
+	// 使用原子写入：先写入临时文件，再通过重命名替换原文件
+	configDir := filepath.Dir(vcm.settingsPath)
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		return fmt.Errorf("创建VS Code配置目录失败: %v", err)
 	}
+
+	tmpFile, err := os.CreateTemp(configDir, "settings-*.json")
+	if err != nil {
+		return fmt.Errorf("创建临时设置文件失败: %v", err)
+	}
+	tmpPath := tmpFile.Name()
+
+	// 确保临时文件被清理
 	defer func() {
-		if err := file.Close(); err != nil {
-			fmt.Printf("警告: 关闭VS Code设置文件失败: %v\n", err)
-		}
+		_ = os.Remove(tmpPath)
 	}()
 
-	encoder := json.NewEncoder(file)
+	// 写入 JSON 数据
+	encoder := json.NewEncoder(tmpFile)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(settings); err != nil {
-		return fmt.Errorf("写入VS Code设置文件失败: %v", err)
+		_ = tmpFile.Close()
+		return fmt.Errorf("写入临时设置文件失败: %v", err)
+	}
+
+	// 确保数据刷入磁盘
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("同步临时设置文件失败: %v", err)
+	}
+
+	// 关闭临时文件句柄，避免在 Windows 上影响重命名
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("关闭临时设置文件失败: %v", err)
+	}
+
+	// 原子替换目标文件
+	if err := os.Rename(tmpPath, vcm.settingsPath); err != nil {
+		return fmt.Errorf("替换VS Code设置文件失败: %v", err)
 	}
 
 	return nil

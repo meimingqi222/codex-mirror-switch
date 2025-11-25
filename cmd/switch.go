@@ -147,14 +147,21 @@ func applyClaudeConfig(mirror *internal.MirrorConfig) error {
 
 // applyCodexConfig 应用Codex配置（修改配置文件并设置环境变量）.
 func applyCodexConfig(mirror *internal.MirrorConfig) error {
-	// 更新Codex CLI配置
-	if err := updateCodexConfig(mirror); err != nil {
-		return err
+	// 检查标志互斥
+	if codexOnly && vscodeOnly {
+		return fmt.Errorf("--codex-only 和 --vscode-only 不能同时使用")
 	}
-	fmt.Println("[OK] Codex CLI配置已更新")
 
-	// 更新VS Code配置
+	// 更新Codex CLI配置（除非只更新VS Code）
 	if !vscodeOnly {
+		if err := updateCodexConfig(mirror); err != nil {
+			return err
+		}
+		fmt.Println("[OK] Codex CLI配置已更新")
+	}
+
+	// 更新VS Code配置（除非只更新Codex CLI）
+	if !codexOnly {
 		if err := updateVSCodeConfig(mirror); err != nil {
 			return err
 		}
