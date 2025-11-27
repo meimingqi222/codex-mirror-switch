@@ -18,6 +18,7 @@ type SyncManager struct {
 	mirrorManager *MirrorManager
 	provider      SyncProvider
 	config        *SyncConfig
+	crypto        *CryptoManager // 加密管理器
 }
 
 // NewSyncManager 创建新的同步管理器.
@@ -164,6 +165,11 @@ func (sm *SyncManager) LoadSync() error {
 
 	sm.config = sm.mirrorManager.config.Sync
 
+	// 创建加密管理器
+	if sm.config.EncryptionPwd != "" {
+		sm.crypto = NewCryptoManager(sm.config.EncryptionPwd)
+	}
+
 	// 创建提供商实例
 	provider, err := sm.createProvider(sm.config)
 	if err != nil {
@@ -207,6 +213,7 @@ func (sm *SyncManager) PushWithStrategy(strategy string) error {
 
 				// 检测冲突
 				resolver := NewConflictResolver(sm.mirrorManager.config, &remoteSyncData)
+				resolver.SetCryptoManager(sm.crypto) // 设置加密管理器，用于解密可能遗漏的 APIKey
 				conflicts := resolver.DetectConflicts()
 
 				if len(conflicts.Conflicts) > 0 {
@@ -373,6 +380,7 @@ func (sm *SyncManager) PullWithStrategy(strategy string) error {
 	// 检测冲突
 	fmt.Printf("🔍 检查配置冲突...\n")
 	resolver := NewConflictResolver(sm.mirrorManager.config, &syncData)
+	resolver.SetCryptoManager(sm.crypto) // 设置加密管理器，用于解密可能遗漏的 APIKey
 	conflicts := resolver.DetectConflicts()
 
 	if len(conflicts.Conflicts) > 0 {
@@ -1069,4 +1077,9 @@ func (sm *SyncManager) confirmChanges() bool {
 			fmt.Printf("❌ 请输入 y (是) 或 n (否)\n")
 		}
 	}
+}
+
+// GetCryptoManager 获取加密管理器.
+func (sm *SyncManager) GetCryptoManager() *CryptoManager {
+	return sm.crypto
 }

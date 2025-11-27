@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -51,18 +52,25 @@ type ConflictResolution struct {
 
 // ConflictResolver 冲突解决器.
 type ConflictResolver struct {
-	localConfig *SystemConfig
-	remoteData  *SyncData
-	Interactive bool // 是否启用交互模式，默认为 true
+	localConfig   *SystemConfig
+	remoteData    *SyncData
+	Interactive   bool           // 是否启用交互模式，默认为 true
+	cryptoManager *CryptoManager // 加密管理器，用于解密远程 APIKey
 }
 
 // NewConflictResolver 创建冲突解决器.
 func NewConflictResolver(localConfig *SystemConfig, remoteData *SyncData) *ConflictResolver {
 	return &ConflictResolver{
-		localConfig: localConfig,
-		remoteData:  remoteData,
-		Interactive: true, // 默认启用交互模式
+		localConfig:   localConfig,
+		remoteData:    remoteData,
+		Interactive:   true, // 默认启用交互模式
+		cryptoManager: nil,  // 默认不设置，如果需要解密则通过 SetCryptoManager 设置
 	}
+}
+
+// SetCryptoManager 设置加密管理器（用于解密远程 APIKey）.
+func (cr *ConflictResolver) SetCryptoManager(cm *CryptoManager) {
+	cr.cryptoManager = cm
 }
 
 // SetInteractive 设置是否启用交互模式.
@@ -742,15 +750,33 @@ func (cr *ConflictResolver) selectCurrentMirror(mergedMirrors map[string]MirrorC
 }
 
 // decryptRemoteAPIKey 解密远程的 APIKey（如果是加密格式）。
-// 注意：在调用 ConflictResolver 之前，应该已经通过 SyncManager.decryptSyncDataAPIKeys 解密了所有远程 APIKey。
-// 这个方法只是为了兼容性，实际上远程数据应该已经是明文了。
 func (cr *ConflictResolver) decryptRemoteAPIKey(apiKey string) string {
-	// 如果还是加密格式，说明解密流程有问题，返回空字符串避免错误比较
-	if strings.HasPrefix(apiKey, "enc:") {
-		fmt.Printf("⚠️  警告：远程 APIKey 仍然是加密格式，可能导致冲突检测不准确\n")
+	// 如果不是加密格式，直接返回
+	if !strings.HasPrefix(apiKey, "enc:") {
+		return apiKey
+	}
+
+	// 如果没有设置加密管理器，无法解密
+	if cr.cryptoManager == nil {
+		fmt.Printf("⚠️  警告：远程 APIKey 是加密格式但未设置加密管理器，无法解密\n")
 		return ""
 	}
-	return apiKey
+
+	// 尝试解密
+	hexData := strings.TrimPrefix(apiKey, "enc:")
+	encrypted, err := hex.DecodeString(hexData)
+	if err != nil {
+		fmt.Printf("⚠️  警告：解码远程 APIKey 失败: %v\n", err)
+		return ""
+	}
+
+	decrypted, err := cr.cryptoManager.Decrypt(encrypted)
+	if err != nil {
+		fmt.Printf("⚠️  警告：解密远程 APIKey 失败: %v\n", err)
+		return ""
+	}
+
+	return string(decrypted)
 }
 
 // maskAPIKey 脱敏显示 APIKey.

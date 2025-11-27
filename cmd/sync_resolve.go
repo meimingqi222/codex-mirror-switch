@@ -59,6 +59,7 @@ func runSyncResolve(cmd *cobra.Command, args []string) error {
 
 	// 检测冲突
 	resolver := internal.NewConflictResolver(mirrorManager.GetConfig(), remoteData)
+	resolver.SetCryptoManager(syncManager.GetCryptoManager()) // 设置加密管理器，用于解密远程 APIKey
 	conflicts := resolver.DetectConflicts()
 	if len(conflicts.Conflicts) == 0 {
 		fmt.Printf("✅ 没有检测到配置冲突\n")
