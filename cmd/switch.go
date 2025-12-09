@@ -15,6 +15,7 @@ var (
 	vscodeOnly bool
 	noBackup   bool
 	shellFmt   string
+	useEnvVar  bool // 使用环境变量方式设置 Claude 配置（默认使用配置文件）
 )
 
 // switchCmd 代表switch命令.
@@ -23,14 +24,17 @@ var switchCmd = &cobra.Command{
 	Short: "切换到指定的镜像源",
 	Long: `切换到指定的镜像源，并根据配置类型自动处理。
 
-Claude 配置：只设置环境变量 (ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN)
+Claude 配置：
+  - 默认：修改 ~/.claude/settings.json 配置文件中的 env 字段
+  - --env：使用系统环境变量方式 (ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN)
 Codex 配置：修改配置文件并设置环境变量
 
 参数：
   name  要切换到的镜像源名称
 
 示例：
-  codex-mirror switch myclaude
+  codex-mirror switch myclaude              # 使用配置文件方式
+  codex-mirror switch myclaude --env        # 使用环境变量方式
   codex-mirror switch mycodex
   codex-mirror switch mycodex --no-backup
 
@@ -102,7 +106,14 @@ Codex 配置：修改配置文件并设置环境变量
 		// 根据工具类型应用配置
 		switch mirror.ToolType {
 		case internal.ToolTypeClaude:
-			if err := applyClaudeConfig(mirror); err != nil {
+			// 获取当前 Claude 镜像的 ExtraEnv 用于清理
+			var oldExtraEnv map[string]string
+			if currentClaude := mm.GetConfig().CurrentClaude; currentClaude != "" {
+				if oldMirror, err := mm.GetMirrorByName(currentClaude); err == nil {
+					oldExtraEnv = oldMirror.ExtraEnv
+				}
+			}
+			if err := applyClaudeConfig(mirror, oldExtraEnv); err != nil {
 				return fmt.Errorf("应用Claude配置失败: %w", err)
 			}
 		case internal.ToolTypeCodex:
@@ -128,17 +139,45 @@ Codex 配置：修改配置文件并设置环境变量
 	},
 }
 
-// applyClaudeConfig 应用Claude配置（只设置环境变量）.
-func applyClaudeConfig(mirror *internal.MirrorConfig) error {
-	envManager := internal.NewEnvManager()
+// applyClaudeConfig 应用Claude配置（默认使用配置文件，--env 时使用环境变量）.
+func applyClaudeConfig(mirror *internal.MirrorConfig, oldExtraEnv map[string]string) error {
+	if useEnvVar {
+		// 使用环境变量方式
+		envManager := internal.NewEnvManager()
 
-	// 设置 Claude 环境变量（包括可选的模型名称）
-	if err := envManager.SetClaudeEnvVarsWithModel(mirror.BaseURL, mirror.APIKey, mirror.ModelName); err != nil {
+		// 设置 Claude 环境变量（包括可选的模型名称）
+		if err := envManager.SetClaudeEnvVarsWithModel(mirror.BaseURL, mirror.APIKey, mirror.ModelName); err != nil {
+			return err
+		}
+
+		// 显示设置的环境变量
+		fmt.Println("[OK] Claude Code环境变量已设置")
+		if mirror.ModelName != "" {
+			fmt.Printf("  模型: %s\n", mirror.ModelName)
+		}
+		return nil
+	}
+
+	// 默认：使用配置文件方式
+	ccm, err := internal.NewClaudeConfigManager()
+	if err != nil {
 		return err
 	}
 
-	// 显示设置的环境变量
-	fmt.Println("[OK] Claude Code环境变量已设置")
+	// 备份现有配置
+	if !noBackup {
+		if err := ccm.BackupSettings(); err != nil {
+			fmt.Printf("警告: 备份Claude配置失败: %v\n", err)
+		}
+	}
+
+	// 应用新配置（同时清理旧镜像的额外环境变量）
+	if err := ccm.ApplyMirrorWithCleanup(mirror, oldExtraEnv); err != nil {
+		return err
+	}
+
+	fmt.Println("[OK] Claude Code配置文件已更新")
+	fmt.Printf("  配置文件: %s\n", ccm.GetSettingsPath())
 	if mirror.ModelName != "" {
 		fmt.Printf("  模型: %s\n", mirror.ModelName)
 	}
@@ -215,6 +254,7 @@ func init() {
 	switchCmd.Flags().BoolVar(&vscodeOnly, "vscode-only", false, "只更新VS Code配置")
 	switchCmd.Flags().BoolVar(&noBackup, "no-backup", false, "不备份现有配置")
 	switchCmd.Flags().StringVar(&shellFmt, "shell", "", "输出适配当前shell的导出语句(bash|zsh|fish|powershell|cmd)")
+	switchCmd.Flags().BoolVar(&useEnvVar, "env", false, "Claude类型使用系统环境变量方式（默认使用配置文件）")
 }
 
 // emitShellExports 将环境变量以指定shell格式输出到stdout。

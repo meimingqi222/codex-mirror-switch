@@ -254,6 +254,91 @@ func CleanupOldCodexEnvVars(lines []string) []string {
 	return cleanupOldCodexEnvVars(lines)
 }
 
+// UnsetEnvVar 清除环境变量（公开方法）.
+func (em *EnvManager) UnsetEnvVar(envKey string) error {
+	// 从当前进程中移除环境变量
+	_ = os.Unsetenv(envKey)
+
+	// 从持久化存储中移除环境变量定义
+	platform := GetCurrentPlatform()
+
+	switch platform {
+	case PlatformWindows:
+		return em.unsetWindowsEnvVar(envKey)
+	case PlatformMac:
+		shellFiles := []string{".zshrc"}
+		return em.unsetUnixEnvVarWithError(envKey, shellFiles)
+	case PlatformLinux:
+		shellFiles := []string{".bashrc", ".profile"}
+		return em.unsetUnixEnvVarWithError(envKey, shellFiles)
+	}
+	return nil
+}
+
+// unsetWindowsEnvVar 在 Windows 中清除用户环境变量.
+func (em *EnvManager) unsetWindowsEnvVar(envKey string) error {
+	cmd := exec.Command("reg", "delete", "HKCU\\Environment", "/v", envKey, "/f")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// 如果变量不存在，reg delete 会返回错误，这是预期行为
+		outputStr := string(output)
+		if strings.Contains(outputStr, "找不到") || strings.Contains(outputStr, "not found") ||
+			strings.Contains(outputStr, "does not exist") || strings.Contains(outputStr, "无法找到") {
+			return nil // 变量本来就不存在，不算错误
+		}
+		return fmt.Errorf("清除环境变量失败: %v", err)
+	}
+	fmt.Printf("[OK] 环境变量 %s 已清除\n", envKey)
+	return nil
+}
+
+// unsetUnixEnvVarWithError 在 Unix 系统中清除环境变量（返回错误）.
+func (em *EnvManager) unsetUnixEnvVarWithError(envKey string, shellFiles []string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("获取用户主目录失败: %v", err)
+	}
+
+	updated := false
+	for _, shellFileName := range shellFiles {
+		shellFile := filepath.Join(homeDir, shellFileName)
+		if _, err := os.Stat(shellFile); os.IsNotExist(err) {
+			continue
+		}
+
+		content, err := os.ReadFile(shellFile)
+		if err != nil {
+			continue
+		}
+
+		lines := strings.Split(string(content), "\n")
+		var newLines []string
+		envPattern := fmt.Sprintf("export %s=", envKey)
+		found := false
+
+		for _, line := range lines {
+			trimmedLine := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmedLine, envPattern) {
+				found = true
+				continue // 跳过这一行
+			}
+			newLines = append(newLines, line)
+		}
+
+		if found {
+			if err := os.WriteFile(shellFile, []byte(strings.Join(newLines, "\n")), 0o644); err != nil {
+				continue
+			}
+			updated = true
+		}
+	}
+
+	if updated {
+		fmt.Printf("[OK] 环境变量 %s 已从 shell 配置文件中清除\n", envKey)
+	}
+	return nil
+}
+
 // unsetEnvironmentVariable 清除环境变量(适用于可选变量).
 func (em *EnvManager) unsetEnvironmentVariable(envKey string) {
 	// 从当前进程中移除环境变量

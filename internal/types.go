@@ -32,6 +32,8 @@ type MirrorConfig struct {
 	LastModified time.Time `json:"last_modified,omitempty" toml:"last_modified,omitempty"` // 最后修改时间
 	Deleted      bool      `json:"deleted,omitempty" toml:"deleted,omitempty"`             // 删除标记
 	DeletedAt    time.Time `json:"deleted_at,omitempty" toml:"deleted_at,omitempty"`       // 删除时间
+	// Claude Code 额外环境变量配置
+	ExtraEnv map[string]string `json:"extra_env,omitempty" toml:"extra_env,omitempty"` // 额外环境变量 (如 ANTHROPIC_DEFAULT_HAIKU_MODEL 等)
 }
 
 // SystemConfig 系统配置结构.

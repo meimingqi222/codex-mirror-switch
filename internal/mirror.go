@@ -142,11 +142,16 @@ func (mm *MirrorManager) AddMirror(name, baseURL, apiKey string) error {
 
 // AddMirrorWithType 添加指定类型的镜像源.
 func (mm *MirrorManager) AddMirrorWithType(name, baseURL, apiKey string, toolType ToolType) error {
-	return mm.AddMirrorWithModel(name, baseURL, apiKey, toolType, "")
+	return mm.AddMirrorWithExtra(name, baseURL, apiKey, toolType, "", nil)
 }
 
 // AddMirrorWithModel 添加指定类型和模型名称的镜像源.
 func (mm *MirrorManager) AddMirrorWithModel(name, baseURL, apiKey string, toolType ToolType, modelName string) error {
+	return mm.AddMirrorWithExtra(name, baseURL, apiKey, toolType, modelName, nil)
+}
+
+// AddMirrorWithExtra 添加指定类型、模型名称和额外环境变量的镜像源.
+func (mm *MirrorManager) AddMirrorWithExtra(name, baseURL, apiKey string, toolType ToolType, modelName string, extraEnv map[string]string) error {
 	// 检查镜像源是否已存在（只检查未删除的）
 	for i := range mm.config.Mirrors {
 		mirror := &mm.config.Mirrors[i]
@@ -159,6 +164,7 @@ func (mm *MirrorManager) AddMirrorWithModel(name, baseURL, apiKey string, toolTy
 			mirror.APIKey = apiKey
 			mirror.ToolType = toolType
 			mirror.ModelName = modelName
+			mirror.ExtraEnv = extraEnv
 			mirror.Deleted = false
 			mirror.DeletedAt = time.Time{}
 			mirror.LastModified = time.Now()
@@ -191,6 +197,7 @@ func (mm *MirrorManager) AddMirrorWithModel(name, baseURL, apiKey string, toolTy
 		APIKey:       apiKey,
 		ToolType:     toolType,
 		ModelName:    modelName,
+		ExtraEnv:     extraEnv,
 		CreatedAt:    now,
 		LastModified: now,
 		Deleted:      false,

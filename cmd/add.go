@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"codex-mirror/internal"
 
@@ -23,11 +24,16 @@ var addCmd = &cobra.Command{
 标志：
   --type   工具类型 (codex|claude, 默认: codex)
   --model  模型名称 (可选，主Claude使用，如 claude-3-5-sonnet-20241022)
+  --extra-env  额外环境变量 (可选，格式: KEY=VALUE，可多次使用)
 
 示例：
   codex-mirror add myapi https://api.example.com sk-1234567890
   codex-mirror add myclaude https://api.anthropic.com sk-ant-123 --type claude
   codex-mirror add custom https://api.custom.com sk-key --type claude --model claude-3-5-sonnet-20241022
+  codex-mirror add proxy https://proxy.example.com sk-key --type claude \
+    --extra-env ANTHROPIC_DEFAULT_HAIKU_MODEL=gemini-2.5-flash-lite \
+    --extra-env ANTHROPIC_DEFAULT_SONNET_MODEL=gemini-claude-sonnet-4-5-thinking \
+    --extra-env ANTHROPIC_DEFAULT_OPUS_MODEL=gemini-claude-opus-4-5-thinking
   codex-mirror add local http://localhost:8080`,
 	Args: cobra.RangeArgs(2, 3),
 	RunE: runAddCommand,
@@ -56,6 +62,10 @@ func runAddCommand(cmd *cobra.Command, args []string) error {
 	// 获取模型名称
 	modelName, _ := cmd.Flags().GetString("model")
 
+	// 获取额外环境变量
+	extraEnvSlice, _ := cmd.Flags().GetStringArray("extra-env")
+	extraEnv := parseExtraEnv(extraEnvSlice)
+
 	// 验证工具类型
 	var internalToolType internal.ToolType
 	switch toolType {
@@ -75,7 +85,7 @@ func runAddCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	// 添加镜像源
-	if err := mm.AddMirrorWithModel(name, baseURL, apiKey, internalToolType, modelName); err != nil {
+	if err := mm.AddMirrorWithExtra(name, baseURL, apiKey, internalToolType, modelName, extraEnv); err != nil {
 		fmt.Fprintf(os.Stderr, "添加镜像源失败: %v\n", err)
 		return fmt.Errorf("添加镜像源失败: %v", err)
 	}
@@ -90,12 +100,31 @@ func runAddCommand(cmd *cobra.Command, args []string) error {
 	if modelName != "" {
 		fmt.Printf("  模型: %s\n", modelName)
 	}
+	if len(extraEnv) > 0 {
+		fmt.Println("  额外环境变量:")
+		for key, value := range extraEnv {
+			fmt.Printf("    %s=%s\n", key, value)
+		}
+	}
 
 	return nil
+}
+
+// parseExtraEnv 解析额外环境变量参数.
+func parseExtraEnv(envSlice []string) map[string]string {
+	result := make(map[string]string)
+	for _, env := range envSlice {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) == 2 {
+			result[parts[0]] = parts[1]
+		}
+	}
+	return result
 }
 
 func init() {
 	addCmd.Flags().StringP("type", "t", "codex", "工具类型 (codex|claude)")
 	addCmd.Flags().StringP("model", "m", "", "模型名称 (可选，主Claude使用)")
+	addCmd.Flags().StringArrayP("extra-env", "e", []string{}, "额外环境变量 (格式: KEY=VALUE，可多次使用)")
 	rootCmd.AddCommand(addCmd)
 }
