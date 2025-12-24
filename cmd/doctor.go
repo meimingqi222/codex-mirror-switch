@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// doctorCmd represents the doctor command
+// doctorCmd represents the doctor command.
 var doctorCmd = &cobra.Command{
 	Use:   "doctor",
 	Short: "诊断并修复配置问题",
@@ -34,7 +34,7 @@ var doctorCmd = &cobra.Command{
 	},
 }
 
-// CheckResult 健康检查结果
+// CheckResult 健康检查结果.
 type CheckResult struct {
 	Name        string
 	Description string
@@ -43,7 +43,7 @@ type CheckResult struct {
 	Fix         string
 }
 
-// HealthCheckFunc 健康检查函数类型
+// HealthCheckFunc 健康检查函数类型.
 type HealthCheckFunc func(verbose bool) CheckResult
 
 func init() {
@@ -52,7 +52,7 @@ func init() {
 	rootCmd.AddCommand(doctorCmd)
 }
 
-// runDoctor 运行健康检查
+// runDoctor 运行健康检查.
 func runDoctor(verbose, skipTest bool) error {
 	fmt.Println("🔍 正在运行健康检查...")
 	fmt.Println()
@@ -120,11 +120,12 @@ func runDoctor(verbose, skipTest bool) error {
 	fmt.Printf("    ❌ 错误: %d\n", errorCount)
 	fmt.Println()
 
-	if hasError {
+	switch {
+	case hasError:
 		fmt.Println("❌ 发现错误，请根据上述建议修复")
-	} else if hasWarning {
+	case hasWarning:
 		fmt.Println("⚠️  发现警告，建议进行优化")
-	} else {
+	default:
 		fmt.Println("✅ 所有检查通过！")
 	}
 
@@ -134,7 +135,7 @@ func runDoctor(verbose, skipTest bool) error {
 	return nil
 }
 
-// checkConfigFile 检查配置文件完整性
+// checkConfigFile 检查配置文件完整性.
 func checkConfigFile(verbose bool) CheckResult {
 	mm, err := internal.NewMirrorManager()
 	if err != nil {
@@ -172,7 +173,7 @@ func checkConfigFile(verbose bool) CheckResult {
 				Description: "检查当前 Claude 镜像",
 				Status:      "warning",
 				Message:     fmt.Sprintf("当前 Claude 镜像 '%s' 不存在", currentClaude),
-				Fix:         fmt.Sprintf("运行 'codex-mirror switch <name>' 切换到其他镜像"),
+				Fix:         "运行 'codex-mirror switch <name>' 切换到其他镜像",
 			}
 		}
 	}
@@ -185,7 +186,7 @@ func checkConfigFile(verbose bool) CheckResult {
 				Description: "检查当前 Codex 镜像",
 				Status:      "warning",
 				Message:     fmt.Sprintf("当前 Codex 镜像 '%s' 不存在", currentCodex),
-				Fix:         fmt.Sprintf("运行 'codex-mirror switch <name>' 切换到其他镜像"),
+				Fix:         "运行 'codex-mirror switch <name>' 切换到其他镜像",
 			}
 		}
 	}
@@ -198,7 +199,7 @@ func checkConfigFile(verbose bool) CheckResult {
 	}
 }
 
-// checkEnvironmentVariables 检查环境变量一致性
+// checkEnvironmentVariables 检查环境变量一致性.
 func checkEnvironmentVariables(verbose bool) CheckResult {
 	mm, err := internal.NewMirrorManager()
 	if err != nil {
@@ -265,7 +266,7 @@ func checkEnvironmentVariables(verbose bool) CheckResult {
 	}
 }
 
-// checkVSCodeConfig 检查 VS Code 配置
+// checkVSCodeConfig 检查 VS Code 配置.
 func checkVSCodeConfig(verbose bool) CheckResult {
 	platform := internal.GetCurrentPlatform()
 
@@ -331,7 +332,7 @@ func checkVSCodeConfig(verbose bool) CheckResult {
 	}
 }
 
-// checkCodexConfig 检查 Codex CLI 配置
+// checkCodexConfig 检查 Codex CLI 配置.
 func checkCodexConfig(verbose bool) CheckResult {
 	mm, err := internal.NewMirrorManager()
 	if err != nil {
@@ -404,7 +405,7 @@ func checkCodexConfig(verbose bool) CheckResult {
 	}
 }
 
-// checkMirrorConnectivity 检查镜像源连通性
+// checkMirrorConnectivity 检查镜像源连通性.
 func checkMirrorConnectivity(verbose bool) CheckResult {
 	mm, err := internal.NewMirrorManager()
 	if err != nil {
@@ -436,11 +437,12 @@ func checkMirrorConnectivity(verbose bool) CheckResult {
 	var skippedMirrors int
 
 	for _, r := range results {
-		if r.Success {
+		switch {
+		case r.Success:
 			okMirrors = append(okMirrors, r.Name)
-		} else if r.Error == "需要 API Key (401)" {
+		case r.Error == "需要 API Key (401)":
 			skippedMirrors++
-		} else {
+		default:
 			errorMirrors = append(errorMirrors, r.Name)
 		}
 	}

@@ -1,8 +1,9 @@
 package cmd
 
 import (
-	"codex-mirror/internal"
 	"os"
+
+	"codex-mirror/internal"
 
 	"github.com/spf13/cobra"
 )

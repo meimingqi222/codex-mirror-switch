@@ -140,7 +140,7 @@ func (mm *MirrorManager) AddMirror(name, baseURL, apiKey string) error {
 	return mm.AddMirrorWithType(name, baseURL, apiKey, ToolTypeCodex) // 默认为 codex 类型
 }
 
-// ClearAPIKey 清除指定镜像源的 API Key
+// ClearAPIKey 清除指定镜像源的 API Key.
 func (mm *MirrorManager) ClearAPIKey(name string) error {
 	for i := range mm.config.Mirrors {
 		mirror := &mm.config.Mirrors[i]

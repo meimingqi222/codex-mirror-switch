@@ -13,10 +13,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// needAPIKey401Msg 需要API Key的错误消息
+// needAPIKey401Msg 需要API Key的错误消息.
 const needAPIKey401Msg = "需要 API Key (401)"
 
-// testCmd represents the test command
+// testCmd represents the test command.
 var testCmd = &cobra.Command{
 	Use:   "test [mirror-name]",
 	Short: "测试镜像源连通性和 API Key 有效性",
@@ -94,7 +94,7 @@ var testCmd = &cobra.Command{
 	},
 }
 
-// TestResult 测试结果
+// TestResult 测试结果.
 type TestResult struct {
 	Name         string            `json:"name"`
 	URL          string            `json:"url"`
@@ -107,13 +107,13 @@ type TestResult struct {
 	NetworkError bool              `json:"network_error,omitempty"` // 新增字段区分网络错误
 }
 
-// OpenAIModelsResponse OpenAI models API 响应
+// OpenAIModelsResponse OpenAI models API 响应.
 type OpenAIModelsResponse struct {
 	Data   []interface{} `json:"data"`
 	Object string        `json:"object"`
 }
 
-// AnthropicMessagesResponse Anthropic messages API 响应 (错误时)
+// AnthropicMessagesResponse Anthropic messages API 响应 (错误时).
 type AnthropicMessagesResponse struct {
 	Type    string `json:"type"`
 	Message string `json:"message"`
@@ -128,8 +128,8 @@ func init() {
 	rootCmd.AddCommand(testCmd)
 }
 
-// testMirror 测试单个镜像源
-func testMirror(mm *internal.MirrorManager, mirror *internal.MirrorConfig, timeout int) error {
+// testMirror 测试单个镜像源.
+func testMirror(_ *internal.MirrorManager, mirror *internal.MirrorConfig, timeout int) error {
 	result := &TestResult{
 		Name:      mirror.Name,
 		URL:       mirror.BaseURL,
@@ -192,7 +192,7 @@ func testMirror(mm *internal.MirrorManager, mirror *internal.MirrorConfig, timeo
 	return nil
 }
 
-// testAllMirrors 测试所有镜像源
+// testAllMirrors 测试所有镜像源.
 func testAllMirrors(mm *internal.MirrorManager, parallel bool, timeout int) error {
 	mirrors := mm.ListActiveMirrors()
 
@@ -251,8 +251,8 @@ func testAllMirrors(mm *internal.MirrorManager, parallel bool, timeout int) erro
 	return nil
 }
 
-// runTest 执行测试（供并行调用）
-func runTest(mm *internal.MirrorManager, mirror *internal.MirrorConfig, timeout int) *TestResult {
+// runTest 执行测试（供并行调用）.
+func runTest(_ *internal.MirrorManager, mirror *internal.MirrorConfig, timeout int) *TestResult {
 	result := &TestResult{
 		Name:      mirror.Name,
 		URL:       mirror.BaseURL,
@@ -305,10 +305,9 @@ func runTest(mm *internal.MirrorManager, mirror *internal.MirrorConfig, timeout 
 	return result
 }
 
-// testConnectivity 测试基础连通性（不验证认证）
-// testConnectivity 测试基础连通性（返回网络可达性和 HTTP 状态码）
-// 返回: reachable (网络是否可达), statusCode (HTTP 状态码), err (错误)
-// 注意: statusCode 仅在网络可达时有效
+// testConnectivity 测试基础连通性（不验证认证）.
+// 返回: reachable (网络是否可达), statusCode (HTTP 状态码), err (错误).
+// 注意: statusCode 仅在网络可达时有效.
 func testConnectivity(mirror *internal.MirrorConfig, timeout int) (reachable bool, statusCode int, err error) {
 	client := &http.Client{
 		Timeout: time.Duration(timeout) * time.Second,
@@ -342,7 +341,7 @@ func testConnectivity(mirror *internal.MirrorConfig, timeout int) (reachable boo
 		req.Header.Set("anthropic-version", "2023-06-01")
 	} else {
 		// Codex/OpenAI: 使用 GET 请求
-		req, httpErr = http.NewRequest("GET", testURL, nil)
+		req, httpErr = http.NewRequest("GET", testURL, http.NoBody)
 		if httpErr != nil {
 			return false, 0, httpErr
 		}
@@ -363,7 +362,7 @@ func testConnectivity(mirror *internal.MirrorConfig, timeout int) (reachable boo
 	return true, resp.StatusCode, nil
 }
 
-// printTestResult 打印测试结果
+// printTestResult 打印测试结果.
 func printTestResult(result *TestResult) {
 	if result.Success {
 		fmt.Printf("✅ %s\n", result.Name)
@@ -397,13 +396,13 @@ func printTestResult(result *TestResult) {
 	}
 }
 
-// PrintResultsAsJSON 将结果打印为 JSON 格式
+// PrintResultsAsJSON 将结果打印为 JSON 格式.
 func PrintResultsAsJSON(results []*TestResult) {
 	data, _ := json.MarshalIndent(results, "", "  ")
 	fmt.Println(string(data))
 }
 
-// GetTestResultsFromAll 测试所有镜像源并返回结果（供程序使用）
+// GetTestResultsFromAll 测试所有镜像源并返回结果（供程序使用）.
 func GetTestResultsFromAll(mm *internal.MirrorManager, timeout int) []*TestResult {
 	mirrors := mm.ListActiveMirrors()
 	results := make([]*TestResult, 0, len(mirrors))
@@ -416,7 +415,7 @@ func GetTestResultsFromAll(mm *internal.MirrorManager, timeout int) []*TestResul
 	return results
 }
 
-// IsAnyMirrorReachable 检查是否有任何镜像源可达
+// IsAnyMirrorReachable 检查是否有任何镜像源可达.
 func IsAnyMirrorReachable(mm *internal.MirrorManager, timeout int) bool {
 	results := GetTestResultsFromAll(mm, timeout)
 	for _, r := range results {
@@ -427,8 +426,8 @@ func IsAnyMirrorReachable(mm *internal.MirrorManager, timeout int) bool {
 	return false
 }
 
-// testAndRemoveInvalidKeys 测试并移除无效的 API Key
-func testAndRemoveInvalidKeys(mm *internal.MirrorManager, testAll bool, removeAll bool, timeout int) error {
+// testAndRemoveInvalidKeys 测试并移除无效的 API Key.
+func testAndRemoveInvalidKeys(mm *internal.MirrorManager, testAll, removeAll bool, timeout int) error {
 	var mirrors []internal.MirrorConfig
 
 	if testAll {
@@ -476,17 +475,18 @@ func testAndRemoveInvalidKeys(mm *internal.MirrorManager, testAll bool, removeAl
 			shouldRemove := false
 			reason := ""
 
-			if strings.Contains(result.Error, "401") || strings.Contains(result.Error, "Unauthorized") {
+			switch {
+			case strings.Contains(result.Error, "401") || strings.Contains(result.Error, "Unauthorized"):
 				shouldRemove = true
 				reason = "API Key 已失效 (401)"
-			} else if strings.Contains(result.Error, "连接失败") {
+			case strings.Contains(result.Error, "连接失败"):
 				if removeAll {
 					shouldRemove = true
 					reason = "连接失败 (移除全部无效)"
 				} else {
 					reason = "连接失败 (跳过，仅移除失效的)"
 				}
-			} else if result.StatusCode >= 400 {
+			case result.StatusCode >= 400:
 				if removeAll {
 					shouldRemove = true
 					reason = fmt.Sprintf("HTTP %d (移除全部无效)", result.StatusCode)

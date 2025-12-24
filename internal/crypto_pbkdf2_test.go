@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// TestPBKDF2Compatibility 测试 PBKDF2 向后兼容性
+// TestPBKDF2Compatibility 测试 PBKDF2 向后兼容性.
 func TestPBKDF2Compatibility(t *testing.T) {
 	password := "test-password-123"
 
@@ -35,7 +35,7 @@ func TestPBKDF2Compatibility(t *testing.T) {
 	}
 }
 
-// TestPBKDF2DeterministicKey 测试相同密码生成相同密钥
+// TestPBKDF2DeterministicKey 测试相同密码生成相同密钥.
 func TestPBKDF2DeterministicKey(t *testing.T) {
 	password := "my-secret-password"
 
@@ -52,7 +52,7 @@ func TestPBKDF2DeterministicKey(t *testing.T) {
 	}
 }
 
-// TestPBKDF2DifferentPasswords 测试不同密码生成不同密钥
+// TestPBKDF2DifferentPasswords 测试不同密码生成不同密钥.
 func TestPBKDF2DifferentPasswords(t *testing.T) {
 	key1 := DeriveKeyFromPassword("password1")
 	key2 := DeriveKeyFromPassword("password2")
@@ -62,7 +62,7 @@ func TestPBKDF2DifferentPasswords(t *testing.T) {
 	}
 }
 
-// TestBackwardCompatibilityWithOldHexKey 测试与旧版本 hex 密钥的向后兼容性
+// TestBackwardCompatibilityWithOldHexKey 测试与旧版本 hex 密钥的向后兼容性.
 func TestBackwardCompatibilityWithOldHexKey(t *testing.T) {
 	// 模拟旧版本生成的 hex 密钥 (64字符) - 测试用假数据
 	oldHexKey := "0000000000000000000000000000000000000000000000000000000000000001"
@@ -81,7 +81,7 @@ func TestBackwardCompatibilityWithOldHexKey(t *testing.T) {
 	}
 }
 
-// TestOldEncryptedDataCanBeDecrypted 测试旧加密数据可以被解密
+// TestOldEncryptedDataCanBeDecrypted 测试旧加密数据可以被解密.
 func TestOldEncryptedDataCanBeDecrypted(t *testing.T) {
 	// 模拟旧版本的工作流程 - 测试用假数据
 	oldHexKey := "0000000000000000000000000000000000000000000000000000000000000002"
@@ -101,12 +101,12 @@ func TestOldEncryptedDataCanBeDecrypted(t *testing.T) {
 		t.Fatalf("新版本解密旧数据失败: %v", err)
 	}
 
-	if string(decrypted) != string(plaintext) {
+	if !bytes.Equal(decrypted, plaintext) {
 		t.Errorf("解密结果不匹配\n期望: %s\n得到: %s", plaintext, decrypted)
 	}
 }
 
-// TestNewPasswordUsePBKDF2 测试新密码使用 PBKDF2
+// TestNewPasswordUsePBKDF2 测试新密码使用 PBKDF2.
 func TestNewPasswordUsePBKDF2(t *testing.T) {
 	password := "my-new-password" // 不是64字符hex
 
@@ -122,7 +122,7 @@ func TestNewPasswordUsePBKDF2(t *testing.T) {
 	}
 }
 
-// TestIsHexString 测试 hex 字符串检测
+// TestIsHexString 测试 hex 字符串检测.
 func TestIsHexString(t *testing.T) {
 	tests := []struct {
 		input    string
@@ -146,7 +146,7 @@ func TestIsHexString(t *testing.T) {
 	}
 }
 
-// TestHexKeyExactly64Chars 测试只有恰好64字符的hex才被识别为旧密钥
+// TestHexKeyExactly64Chars 测试只有恰好64字符的hex才被识别为旧密钥.
 func TestHexKeyExactly64Chars(t *testing.T) {
 	// 63字符 hex - 应使用 PBKDF2 - 测试用假数据
 	key63 := "00000000000000000000000000000000000000000000000000000000000000a"
@@ -173,7 +173,7 @@ func TestHexKeyExactly64Chars(t *testing.T) {
 	}
 }
 
-// TestDecryptBackwardCompatibility 测试解密时的向后兼容性
+// TestDecryptBackwardCompatibility 测试解密时的向后兼容性.
 func TestDecryptBackwardCompatibility(t *testing.T) {
 	// 测试场景1：旧版本使用明文密码 + SHA256 加密的数据
 	oldPassword := "my-secret-password"
