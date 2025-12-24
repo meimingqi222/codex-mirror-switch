@@ -140,6 +140,21 @@ func (mm *MirrorManager) AddMirror(name, baseURL, apiKey string) error {
 	return mm.AddMirrorWithType(name, baseURL, apiKey, ToolTypeCodex) // 默认为 codex 类型
 }
 
+// ClearAPIKey 清除指定镜像源的 API Key
+func (mm *MirrorManager) ClearAPIKey(name string) error {
+	for i := range mm.config.Mirrors {
+		mirror := &mm.config.Mirrors[i]
+		if mirror.Name == name && !mirror.Deleted {
+			if mirror.APIKey != "" {
+				mirror.APIKey = ""
+				mirror.LastModified = time.Now()
+				return mm.saveConfig()
+			}
+		}
+	}
+	return fmt.Errorf("镜像源 '%s' 不存在或没有 API Key 需要清除", name)
+}
+
 // AddMirrorWithType 添加指定类型的镜像源.
 func (mm *MirrorManager) AddMirrorWithType(name, baseURL, apiKey string, toolType ToolType) error {
 	return mm.AddMirrorWithExtra(name, baseURL, apiKey, toolType, "", nil)
@@ -521,7 +536,7 @@ func (mm *MirrorManager) discoverFromEnvironment() {
 	// 保存发现的配置
 	if len(discoveredMirrors) > 0 {
 		if err := mm.saveConfig(); err != nil {
-			fmt.Printf("保存配置失败: %v\n", err)
+			fmt.Fprintf(os.Stderr, "保存配置失败: %v\n", err)
 		}
 	}
 }

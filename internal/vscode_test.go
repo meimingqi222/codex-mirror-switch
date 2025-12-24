@@ -260,16 +260,16 @@ func TestVSCodeApplyMirror(t *testing.T) {
 				t.Errorf("preferred_auth_method = %v, expected apikey", authMethod)
 			}
 
-			if model, ok := configMap["model"]; !ok || model != "gpt-5" {
-				t.Errorf("model = %v, expected gpt-5", model)
+			if model, ok := configMap["model"]; !ok || model != DefaultModelGPT4 {
+				t.Errorf("model = %v, expected %s", model, DefaultModelGPT4)
 			}
 
-			if reasoningEffort, ok := configMap["model_reasoning_effort"]; !ok || reasoningEffort != "high" {
-				t.Errorf("model_reasoning_effort = %v, expected high", reasoningEffort)
+			if reasoningEffort, ok := configMap["model_reasoning_effort"]; !ok || reasoningEffort != "medium" {
+				t.Errorf("model_reasoning_effort = %v, expected medium", reasoningEffort)
 			}
 
-			if wireAPI, ok := configMap["wire_api"]; !ok || wireAPI != "responses" {
-				t.Errorf("wire_api = %v, expected responses", wireAPI)
+			if wireAPI, ok := configMap["wire_api"]; !ok || wireAPI != "messages" {
+				t.Errorf("wire_api = %v, expected messages", wireAPI)
 			}
 
 			// 验证旧设置被保留
@@ -598,8 +598,8 @@ func TestApplyMirrorEmptySettings(t *testing.T) {
 
 	if config, ok := settings["chatgpt.config"]; ok {
 		if configMap, ok := config.(map[string]interface{}); ok {
-			if model, ok := configMap["model"]; !ok || model != "gpt-5" {
-				t.Errorf("model = %v, expected gpt-5", model)
+			if model, ok := configMap["model"]; !ok || model != DefaultModelGPT4 {
+				t.Errorf("model = %v, expected %s", model, DefaultModelGPT4)
 			}
 		} else {
 			t.Error("chatgpt.config should be a map")

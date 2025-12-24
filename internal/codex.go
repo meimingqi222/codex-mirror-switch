@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -198,13 +197,13 @@ func (ccm *CodexConfigManager) updateRawConfigBasicFields(rawConfig map[string]i
 	if mirror.ModelName != "" {
 		config.Model = mirror.ModelName
 	} else {
-		config.Model = TestModelGPT5
+		config.Model = DefaultModelGPT4
 	}
 	rawConfig["model"] = config.Model
 
 	// 更新 ModelReasoningEffort 字段
 	if config.ModelReasoningEffort == "" {
-		config.ModelReasoningEffort = TestHighEffort
+		config.ModelReasoningEffort = DefaultHighEffort
 	}
 	rawConfig["model_reasoning_effort"] = config.ModelReasoningEffort
 
@@ -665,59 +664,10 @@ func (ccm *CodexConfigManager) UpdateAuth(mirror *MirrorConfig) error {
 }
 
 // SetEnvironmentVariable 设置环境变量.
+// 委托给 EnvManager 处理，避免代码重复.
 func (ccm *CodexConfigManager) SetEnvironmentVariable(envKey, apiKey string) error {
-	if envKey == "" {
-		return fmt.Errorf("环境变量key不能为空")
-	}
-
-	// 直接使用传入的envKey，不再添加前缀（因为已经包含CODEX_前缀）
-	// 在当前进程中设置环境变量
-	if err := os.Setenv(envKey, apiKey); err != nil {
-		return fmt.Errorf("设置环境变量 %s 失败: %v", envKey, err)
-	}
-
-	// 根据平台设置持久化环境变量
-	platform := GetCurrentPlatform()
-	switch platform {
-	case PlatformWindows:
-		if err := ccm.setWindowsUserEnvVar(envKey, apiKey); err != nil {
-			return fmt.Errorf("设置Windows用户环境变量 %s 失败: %v", envKey, err)
-		}
-	case PlatformMac:
-		if err := ccm.setMacUserEnvVar(envKey, apiKey); err != nil {
-			return fmt.Errorf("设置macOS用户环境变量 %s 失败: %v", envKey, err)
-		}
-	case PlatformLinux:
-		if err := ccm.setLinuxUserEnvVar(envKey, apiKey); err != nil {
-			return fmt.Errorf("设置Linux用户环境变量 %s 失败: %v", envKey, err)
-		}
-	}
-
-	return nil
-}
-
-// setWindowsUserEnvVar 在Windows中设置用户级环境变量.
-func (ccm *CodexConfigManager) setWindowsUserEnvVar(envKey, apiKey string) error {
-	// 使用setx命令设置用户级环境变量
-	cmd := exec.Command("setx", envKey, apiKey)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("执行setx命令失败: %v, 输出: %s", err, string(output))
-	}
-	fmt.Printf("[OK] 环境变量 %s 已设置\n", envKey)
-	return nil
-}
-
-// setMacUserEnvVar 在macOS中设置用户级环境变量.
-func (ccm *CodexConfigManager) setMacUserEnvVar(envKey, apiKey string) error {
-	shellFiles := []string{".zshrc"} // macOS 默认使用 zsh
-	return setUnixUserEnvVar(envKey, apiKey, shellFiles)
-}
-
-// setLinuxUserEnvVar 在Linux中设置用户级环境变量.
-func (ccm *CodexConfigManager) setLinuxUserEnvVar(envKey, apiKey string) error {
-	shellFiles := []string{".bashrc", ".profile"} // bash (最常见), 通用profile.
-	return setUnixUserEnvVar(envKey, apiKey, shellFiles)
+	envManager := NewEnvManager()
+	return envManager.SetCodexEnvVar(envKey, apiKey)
 }
 
 // ApplyMirror 应用镜像源配置到Codex CLI.

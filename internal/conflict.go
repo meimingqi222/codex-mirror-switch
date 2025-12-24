@@ -780,14 +780,9 @@ func (cr *ConflictResolver) decryptRemoteAPIKey(apiKey string) string {
 }
 
 // maskAPIKey 脱敏显示 APIKey.
+// 委托给统一的 MaskAPIKey 函数.
 func maskAPIKey(apiKey string) string {
-	if apiKey == "" {
-		return ""
-	}
-	if len(apiKey) <= 8 {
-		return "****"
-	}
-	return apiKey[:4] + "****" + apiKey[len(apiKey)-4:]
+	return MaskAPIKey(apiKey)
 }
 
 // FormatConflicts 格式化冲突信息用于显示.

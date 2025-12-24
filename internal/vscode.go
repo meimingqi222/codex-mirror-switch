@@ -123,9 +123,13 @@ func (vcm *VSCodeConfigManager) ApplyMirror(mirror *MirrorConfig) error {
 
 	// 设置基本配置项
 	chatgptConfig["preferred_auth_method"] = "apikey"
-	chatgptConfig["model"] = TestModelGPT5
-	chatgptConfig["model_reasoning_effort"] = TestHighEffort
-	chatgptConfig["wire_api"] = TestResponsesDir
+	if mirror.ModelName != "" {
+		chatgptConfig["model"] = mirror.ModelName
+	} else {
+		chatgptConfig["model"] = "gpt-4o"
+	}
+	chatgptConfig["model_reasoning_effort"] = "medium"
+	chatgptConfig["wire_api"] = "messages"
 
 	// 移除不必要的baseurl和key设置
 	delete(chatgptConfig, "apiKey")

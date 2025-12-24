@@ -78,8 +78,8 @@ func TestUpdateConfig(t *testing.T) {
 		t.Errorf("ModelProvider = %v, expected test-provider", config.ModelProvider)
 	}
 
-	if config.Model != TestModelGPT5 {
-		t.Errorf("Model = %v, expected gpt-5", config.Model)
+	if config.Model != DefaultModelGPT4 {
+		t.Errorf("Model = %v, expected gpt-4o", config.Model)
 	}
 
 	if config.ModelReasoningEffort != TestHighEffort {
@@ -186,8 +186,8 @@ func TestUpdateConfigExisting(t *testing.T) {
 	}
 
 	// 验证默认值被设置
-	if updatedConfig.Model != TestModelGPT5 {
-		t.Errorf("Model should be updated to gpt-5, got %v", updatedConfig.Model)
+	if updatedConfig.Model != DefaultModelGPT4 {
+		t.Errorf("Model should be updated to gpt-4o, got %v", updatedConfig.Model)
 	}
 
 	if !updatedConfig.DisableResponseStorage {

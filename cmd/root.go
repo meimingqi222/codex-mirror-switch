@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"codex-mirror/internal"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -35,11 +36,9 @@ func Execute() {
 }
 
 // maskAPIKey 遮蔽API密钥，只显示前4位和后4位.
+// 委托给 internal.MaskAPIKey 避免重复代码.
 func maskAPIKey(apiKey string) string {
-	if len(apiKey) <= 8 {
-		return "****"
-	}
-	return apiKey[:4] + "****" + apiKey[len(apiKey)-4:]
+	return internal.MaskAPIKey(apiKey)
 }
 
 func init() {
