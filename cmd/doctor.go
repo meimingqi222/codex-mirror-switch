@@ -53,7 +53,7 @@ func init() {
 }
 
 // runDoctor 运行健康检查
-func runDoctor(verbose bool, skipTest bool) error {
+func runDoctor(verbose, skipTest bool) error {
 	fmt.Println("🔍 正在运行健康检查...")
 	fmt.Println()
 

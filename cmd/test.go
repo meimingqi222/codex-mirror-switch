@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -13,6 +12,9 @@ import (
 
 	"github.com/spf13/cobra"
 )
+
+// needAPIKey401Msg 需要API Key的错误消息
+const needAPIKey401Msg = "需要 API Key (401)"
 
 // testCmd represents the test command
 var testCmd = &cobra.Command{
@@ -98,7 +100,7 @@ type TestResult struct {
 	URL          string            `json:"url"`
 	ToolType     internal.ToolType `json:"tool_type"`
 	Success      bool              `json:"success"`
-	Latency      int64             `json:"latency_ms"`  // 改为 int64 毫秒
+	Latency      int64             `json:"latency_ms"` // 改为 int64 毫秒
 	StatusCode   int               `json:"status_code,omitempty"`
 	Error        string            `json:"error,omitempty"`
 	HasAPIKey    bool              `json:"has_api_key"`
@@ -175,7 +177,7 @@ func testMirror(mm *internal.MirrorManager, mirror *internal.MirrorConfig, timeo
 		if mirror.APIKey != "" {
 			result.Error = "API Key 无效 (401)"
 		} else {
-			result.Error = "需要 API Key (401)"
+			result.Error = needAPIKey401Msg
 		}
 		printTestResult(result)
 		return nil
@@ -259,7 +261,7 @@ func runTest(mm *internal.MirrorManager, mirror *internal.MirrorConfig, timeout 
 	}
 
 	startTime := time.Now()
-	
+
 	// 测试基础连通性
 	reachable, statusCode, err := testConnectivity(mirror, timeout)
 	result.Latency = time.Since(startTime).Milliseconds()
@@ -353,67 +355,12 @@ func testConnectivity(mirror *internal.MirrorConfig, timeout int) (reachable boo
 	if httpErr != nil {
 		return false, 0, httpErr
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
-	// 网络成功到达，返回状态码和响应体（可能用于错误信息）
-	// 所有 HTTP 状态码都视为网络可达，由调用方判断语义
-	// 注意：这里不返回错误，只用于状态码判断
+	// 网络成功到达，返回状态码和响应体（可能用于错误信息）.
+	// 所有 HTTP 状态码都视为网络可达，由调用方判断语义.
+	// 注意：这里不返回错误，只用于状态码判断.
 	return true, resp.StatusCode, nil
-}
-
-// testAPIAuth 测试 API 认证有效性
-func testAPIAuth(mirror *internal.MirrorConfig, timeout int) (bool, int, []byte) {
-	client := &http.Client{
-		Timeout: time.Duration(timeout) * time.Second,
-	}
-
-	var testURL string
-	var req *http.Request
-	var err error
-
-	switch mirror.ToolType {
-	case internal.ToolTypeClaude:
-		// Anthropic: 发送一个简单的请求来验证 API Key
-		testURL = strings.TrimSuffix(mirror.BaseURL, "/") + "/v1/messages"
-		
-		body := `{"model": "claude-sonnet-4-20250514", "max_tokens": 10, "messages": [{"role": "user", "content": "hi"}]}`
-		req, err = http.NewRequest("POST", testURL, bytes.NewBufferString(body))
-		if err != nil {
-			return false, 0, nil
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("x-api-key", mirror.APIKey)
-		req.Header.Set("anthropic-version", "2023-06-01")
-		
-	default:
-		// OpenAI: 使用 models 端点验证
-		testURL = strings.TrimSuffix(mirror.BaseURL, "/") + "/v1/models"
-		req, err = http.NewRequest("GET", testURL, nil)
-		if err != nil {
-			return false, 0, nil
-		}
-		req.Header.Set("Authorization", "Bearer "+mirror.APIKey)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return false, 0, nil
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-
-	// 401 表示认证失败
-	if resp.StatusCode == 401 {
-		return false, 401, body
-	}
-
-	// 其他错误码可能是临时问题
-	if resp.StatusCode >= 400 {
-		return false, resp.StatusCode, body
-	}
-
-	return true, resp.StatusCode, body
 }
 
 // printTestResult 打印测试结果
@@ -524,7 +471,7 @@ func testAndRemoveInvalidKeys(mm *internal.MirrorManager, testAll bool, removeAl
 			fmt.Printf("   ✅ API Key 有效\n\n")
 		} else {
 			invalidMirrors = append(invalidMirrors, mirror.Name)
-			
+
 			// 判断是否应该移除
 			shouldRemove := false
 			reason := ""
@@ -601,4 +548,3 @@ func testAndRemoveInvalidKeys(mm *internal.MirrorManager, testAll bool, removeAl
 
 	return nil
 }
-

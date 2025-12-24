@@ -32,7 +32,7 @@ type CryptoManager struct {
 // 向后兼容：自动检测旧的 hex 密钥格式（64字符）并使用 SHA256.
 func NewCryptoManager(password string) *CryptoManager {
 	var key []byte
-	
+
 	// 检测是否是旧的 hex 密钥格式 (generateEncryptKey 生成的64字符hex)
 	if len(password) == 64 && isHexString(password) {
 		// 向后兼容：使用旧的 SHA256 方法处理 hex 密钥
@@ -42,17 +42,17 @@ func NewCryptoManager(password string) *CryptoManager {
 		// 新方法：使用 PBKDF2 将密码派生为 32 字节密钥
 		key = pbkdf2.Key([]byte(password), defaultSalt, pbkdf2Iterations, pbkdf2KeyLen, sha256.New)
 	}
-	
+
 	return &CryptoManager{
-		key:       key,
-		password:  password, // 保存原始密码用于向后兼容
+		key:      key,
+		password: password, // 保存原始密码用于向后兼容
 	}
 }
 
 // isHexString 检查字符串是否为有效的十六进制字符串.
 func isHexString(s string) bool {
 	if s == "" || len(s)%2 != 0 {
-		return false  // 空字符串或奇数长度不是有效hex
+		return false // 空字符串或奇数长度不是有效hex
 	}
 	_, err := hex.DecodeString(s)
 	return err == nil
@@ -91,7 +91,7 @@ func (cm *CryptoManager) Decrypt(ciphertext []byte) ([]byte, error) {
 	if err == nil {
 		return plaintext, nil
 	}
-	
+
 	// 如果当前密钥解密失败，且密码不是64字符hex，尝试旧的SHA256方法
 	if len(cm.password) != 64 || !isHexString(cm.password) {
 		// 使用旧的SHA256方法派生密钥
@@ -101,13 +101,13 @@ func (cm *CryptoManager) Decrypt(ciphertext []byte) ([]byte, error) {
 			return plaintext, nil
 		}
 	}
-	
+
 	// 所有方法都失败，返回最后一个错误
 	return nil, err
 }
 
 // decryptWithKey 使用指定密钥解密数据.
-func (cm *CryptoManager) decryptWithKey(key []byte, ciphertext []byte) ([]byte, error) {
+func (cm *CryptoManager) decryptWithKey(key, ciphertext []byte) ([]byte, error) {
 	// 创建AES cipher
 	block, err := aes.NewCipher(key)
 	if err != nil {
