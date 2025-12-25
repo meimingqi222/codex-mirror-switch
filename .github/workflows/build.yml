@@ -35,6 +35,9 @@ jobs:
       env:
         GOOS: ${{ matrix.goos }}
         GOARCH: ${{ matrix.goarch }}
+        VERSION: ${{ github.ref_name }}
+        BUILD_TIME: ${{ github.event.head_commit.timestamp }}
+        GIT_COMMIT: ${{ github.sha }}
       run: |
         # 设置输出文件名
         if [ "$GOOS" = "windows" ]; then
@@ -43,8 +46,8 @@ jobs:
           OUTPUT_NAME="codex-mirror"
         fi
         
-        # 编译二进制文件
-        go build -ldflags="-s -w" -o "$OUTPUT_NAME" main.go
+        # 编译二进制文件，注入版本信息
+        go build -ldflags="-s -w -X codex-mirror/cmd.Version=${VERSION} -X codex-mirror/cmd.BuildTime=${BUILD_TIME} -X codex-mirror/cmd.GitCommit=${GIT_COMMIT}" -o "$OUTPUT_NAME" main.go
         
         # 创建发布目录
         mkdir -p release

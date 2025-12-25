@@ -372,6 +372,15 @@ func (sm *SyncManager) PullWithStrategy(strategy string) error {
 		return fmt.Errorf("解析同步数据失败: %w", err)
 	}
 
+	// 在解密 APIKey 之前先校验校验和（校验和基于加密前的镜像数据）
+	if !syncData.ValidatedChecksum {
+		rawMirrorsData, _ := json.Marshal(syncData.Mirrors)
+		if calculateChecksum(rawMirrorsData) != syncData.Checksum {
+			return fmt.Errorf("数据校验和不匹配，可能数据已损坏")
+		}
+		syncData.ValidatedChecksum = true
+	}
+
 	// 解密所有远程镜像源的 APIKey（在冲突检测之前）
 	if err := sm.decryptSyncDataAPIKeys(&syncData); err != nil {
 		return fmt.Errorf("解密远程 API 密钥失败: %w", err)
@@ -667,10 +676,13 @@ func (sm *SyncManager) exportSyncData() *SyncData {
 
 // applySyncData 应用同步数据.
 func (sm *SyncManager) applySyncData(syncData *SyncData) error {
-	// 验证校验和
-	data, _ := json.Marshal(syncData.Mirrors)
-	if calculateChecksum(data) != syncData.Checksum {
-		return fmt.Errorf("数据校验和不匹配，可能数据已损坏")
+	// 校验和仅在未验证时计算（避免解密后因明文APIKey导致不一致）
+	if !syncData.ValidatedChecksum {
+		data, _ := json.Marshal(syncData.Mirrors)
+		if calculateChecksum(data) != syncData.Checksum {
+			return fmt.Errorf("数据校验和不匹配，可能数据已损坏")
+		}
+		syncData.ValidatedChecksum = true
 	}
 
 	// 备份当前配置

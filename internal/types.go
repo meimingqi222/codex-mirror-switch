@@ -132,15 +132,16 @@ type SyncConfig struct {
 
 // SyncData 同步数据结构.
 type SyncData struct {
-	Mirrors        []MirrorConfig `json:"mirrors"`                   // 镜像源配置（可能包含加密的API密钥）
-	CurrentCodex   string         `json:"current_codex"`             // 当前 Codex 镜像源
-	CurrentClaude  string         `json:"current_claude"`            // 当前 Claude 镜像源
-	Timestamp      time.Time      `json:"timestamp"`                 // 时间戳
-	DeviceID       string         `json:"device_id"`                 // 设备ID
-	Version        string         `json:"version"`                   // 配置版本
-	Checksum       string         `json:"checksum,omitempty"`        // 数据校验和
-	HasAPIKeys     bool           `json:"has_api_keys"`              // 是否包含API密钥
-	DeletedMirrors []MirrorConfig `json:"deleted_mirrors,omitempty"` // 已删除的镜像源（用于追踪删除操作）
+	Mirrors           []MirrorConfig `json:"mirrors"`                   // 镜像源配置（可能包含加密的API密钥）
+	CurrentCodex      string         `json:"current_codex"`             // 当前 Codex 镜像源
+	CurrentClaude     string         `json:"current_claude"`            // 当前 Claude 镜像源
+	Timestamp         time.Time      `json:"timestamp"`                 // 时间戳
+	DeviceID          string         `json:"device_id"`                 // 设备ID
+	Version           string         `json:"version"`                   // 配置版本
+	Checksum          string         `json:"checksum,omitempty"`        // 数据校验和
+	HasAPIKeys        bool           `json:"has_api_keys"`              // 是否包含API密钥
+	DeletedMirrors    []MirrorConfig `json:"deleted_mirrors,omitempty"` // 已删除的镜像源（用于追踪删除操作）
+	ValidatedChecksum bool           `json:"-"`                         // 本地校验标记（不参与序列化）
 }
 
 // SecureMirrorConfig 安全的镜像源配置（不包含API密钥）.

@@ -8,7 +8,7 @@ GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 # Go 相关变量
 GO := go
-GOFLAGS := -ldflags="-s -w -X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME) -X main.gitCommit=$(GIT_COMMIT)"
+GOFLAGS := -ldflags="-s -w -X codex-mirror/cmd.Version=$(VERSION) -X codex-mirror/cmd.BuildTime=$(BUILD_TIME) -X codex-mirror/cmd.GitCommit=$(GIT_COMMIT)"
 GOMOD := $(GO) mod
 GOBUILD := $(GO) build
 GOTEST := $(GO) test
