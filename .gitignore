@@ -69,11 +69,13 @@ codex-mirror.exe
 codex-mirror
 *.toml.backup
 .trae/
-.claude/
 
-.qoder/
+# AI 工具的用户配置和缓存
+.claude/        # Claude Code 用户配置和会话缓存
+.qoder/         # Qoder AI 工具配置
+CLAUDE.md       # Claude Code 个人配置文件（参考 docs/development-guide.md）
 
-# 内部文档和工作文件
+# 内部文档和工作文件（临时、个人笔记等）
 CODEBUDDY.md
 SYNC_FEATURE_HANDOVER.md
 WARP.md
