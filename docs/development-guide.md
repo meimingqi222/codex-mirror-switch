@@ -1,6 +1,8 @@
-# CLAUDE.md
+# Development Guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This guide provides comprehensive information about the project architecture, development workflow, and best practices for contributing to codex-mirror-switch.
+
+> **Note**: This file was originally created as `CLAUDE.md` for Claude Code integration, but has been moved to the docs directory to serve as general development documentation for all contributors.
 
 ## Project Overview
 
@@ -32,6 +34,13 @@ The tool supports two tool types:
 - `go test -run TestSwitch ./cmd` - Run specific test
 - `go test -run TestMirrorManager ./internal` - Run specific internal package test
 - `go run main.go --help` - Run locally without building
+
+### Version Information
+Version info is injected at build time via ldflags:
+- `cmd.Version` - Git tag or "dev"
+- `cmd.BuildTime` - Build timestamp
+- `cmd.GitCommit` - Short commit hash
+- View with: `./build/codex-mirror version` or `make version`
 
 ## Architecture Overview
 
@@ -77,6 +86,14 @@ Each command is a separate file using Cobra framework:
 - `sync*.go`: Cloud sync commands (`sync push`, `sync pull`, `sync status`, `sync init`)
 - `sync_resolve.go`: Interactive conflict resolution for sync conflicts
 - `sync_help.go`: Detailed sync feature documentation
+- `doctor.go`: Health check command that diagnoses configuration issues
+  - Checks config file integrity, environment variables, VS Code/Codex config
+  - Optional mirror connectivity testing with `--skip-test` flag
+  - Returns `CheckResult` structs with status (ok/warning/error/skipped)
+- `test.go`: Test mirror connectivity to validate API endpoints
+- `update.go`: Update mirror configuration (API keys, URLs, etc.)
+- `version.go`: Display version, build time, and git commit info
+- `clean.go`: Clean up orphaned/invalid configurations
 
 ### Configuration Management
 The tool manages three types of configuration:
@@ -103,9 +120,13 @@ The tool manages three types of configuration:
 - `ANTHROPIC_BASE_URL`: API base URL
 - `ANTHROPIC_AUTH_TOKEN`: Claude API token
 - `ANTHROPIC_MODEL`: Model name (optional, if specified in mirror config)
+- Extra environment variables via `ExtraEnv` map in mirror config (e.g., `ANTHROPIC_DEFAULT_HAIKU_MODEL`)
 
 **Codex type mirrors** set:
 - `CODEX_SWITCH_OPENAI_API_KEY`: Tool's own env var for API key
+
+**Configuration discovery:**
+- `CODEX_MIRROR_CONFIG_PATH`: Override default config location (`~/.codex-mirror/mirrors.toml`)
 
 **Persistence mechanisms:**
 - **Windows**: Registry via `setx` command (user-level, permanent)
@@ -133,10 +154,11 @@ The tool manages three types of configuration:
 
 ### Configuration Security
 - Never commit real API keys (use placeholders like "sk-test-key")
-- All API keys masked in output via `maskAPIKey()` in `root.go` (shows first/last 4 chars only)
-- Optional API key encryption for cloud sync via `internal/crypto.go`
+- All API keys masked in output via `maskAPIKey()` in [root.go:67](cmd/root.go#L67) (shows first/last 4 chars only)
+- Optional API key encryption for cloud sync via [internal/crypto.go](internal/crypto.go)
 - Configuration stored in user directories, not system-wide
 - Gist sync uses device-specific encryption keys
+- Use `CODEX_MIRROR_CONFIG_PATH` for testing with isolated config files
 
 ### Dependencies
 - `github.com/spf13/cobra` - CLI framework for command structure
@@ -144,6 +166,11 @@ The tool manages three types of configuration:
 - Go 1.23+ required (Go 1.23.12+ recommended for golangci-lint compatibility)
 
 ### Key Implementation Details
+
+**Atomic Configuration Writes:**
+- Configuration saves use atomic writes via temp file + rename pattern (see [mirror.go:68-110](internal/mirror.go#L68-L110))
+- Prevents corruption if write operation is interrupted
+- Cross-platform safe (handles Windows file locking)
 
 **Forward Compatibility:**
 - `CodexConfig.OtherFields` map preserves unknown TOML fields when reading/writing config
@@ -162,6 +189,10 @@ The tool manages three types of configuration:
 - Use `internal.GetPathConfig()` for platform-specific config directories
 - All path operations use `filepath.Join()` for cross-platform compatibility
 
+**Data Validation:**
+- Mirror configs include data checksums to detect corruption
+- Version field tracks config format changes for migrations
+
 ### Adding New Features
 
 **Add new command:**
@@ -171,13 +202,20 @@ The tool manages three types of configuration:
 4. Add tests in `cmd/cmd_test.go`
 
 **Modify configuration format:**
-1. Update structs in `internal/types.go`
-2. Update `MirrorManager.loadConfig()` and `saveConfig()` in `mirror.go`
+1. Update structs in [internal/types.go](internal/types.go)
+2. Update `MirrorManager.loadConfig()` and `saveConfig()` in [internal/mirror.go](internal/mirror.go)
 3. Add migration logic if changing existing fields
 4. Update tests to verify backward compatibility
 
 **Add new platform:**
-1. Add platform constant to `internal/types.go` (e.g., `PlatformFreeBSD`)
-2. Extend `GetPathConfig()` in `internal/platform.go`
-3. Update `SetEnvVar()` and `GetEnvVar()` in `internal/env.go` if needed
-4. Add platform-specific tests in `internal/platform_test.go`
+1. Add platform constant to [internal/types.go](internal/types.go) (e.g., `PlatformFreeBSD`)
+2. Extend `GetPathConfig()` in [internal/platform.go](internal/platform.go)
+3. Update `SetEnvVar()` and `GetEnvVar()` in [internal/env.go](internal/env.go) if needed
+4. Add platform-specific tests in [internal/platform_test.go](internal/platform_test.go)
+
+**Troubleshooting Configuration Issues:**
+1. Use `codex-mirror doctor` to diagnose common problems
+2. Use `codex-mirror doctor --verbose` for detailed output
+3. Use `codex-mirror doctor --skip-test` to skip connectivity checks
+4. Check `~/.codex-mirror/mirrors.toml` for corruption
+5. Use `CODEX_MIRROR_CONFIG_PATH` env var for testing with isolated configs
