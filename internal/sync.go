@@ -232,61 +232,7 @@ func (sm *SyncManager) PushWithStrategy(strategy string) error {
 	return sm.performPush(filename)
 }
 
-// handlePushConflicts 处理推送时的配置冲突.
-func (sm *SyncManager) handlePushConflicts(resolver *ConflictResolver, conflicts *ConflictResolution, strategy string, remoteSyncData *SyncData) error {
-	fmt.Printf("⚠️  检测到推送冲突\n\n")
-	fmt.Printf("🔍 云端配置信息:\n")
-	fmt.Printf("   来源设备: %s\n", remoteSyncData.DeviceID)
-	fmt.Printf("   配置时间: %s\n", remoteSyncData.Timestamp.Format("2006-01-02 15:04:05"))
-	fmt.Printf("   镜像源数量: %d\n\n", len(remoteSyncData.Mirrors))
-	fmt.Printf("%s", resolver.FormatConflicts(conflicts))
 
-	switch strategy {
-	case "auto", StrategyMerge:
-		return sm.handlePushAutoResolve(resolver, conflicts, remoteSyncData)
-	case "force":
-		fmt.Printf("🚀 强制推送模式，覆盖云端配置...\n")
-		return sm.performPush(ConfigFileName)
-	case "manual":
-		return fmt.Errorf("检测到配置冲突，请选择解决策略:\n\n" +
-			"  codex-mirror sync push --strategy=force  # 强制覆盖云端配置\n" +
-			"  codex-mirror sync push --strategy=merge  # 智能合并后推送\n" +
-			"  codex-mirror sync pull --strategy=merge  # 先拉取合并，再推送\n\n" +
-			"💡 建议先使用 pull --strategy=merge 合并云端配置，再推送")
-	default:
-		return fmt.Errorf("不支持的推送策略: %s", strategy)
-	}
-}
-
-// handlePushAutoResolve 自动解决推送冲突.
-func (sm *SyncManager) handlePushAutoResolve(resolver *ConflictResolver, conflicts *ConflictResolution, _ *SyncData) error {
-	fmt.Printf("🔄 自动合并本地和云端配置...\n")
-
-	// 使用合并策略解决冲突
-	resolvedConfig, err := resolver.ResolveConflicts(conflicts, StrategyMerge)
-	if err != nil {
-		return fmt.Errorf("自动解决冲突失败: %w", err)
-	}
-
-	// 创建备份
-	if err := sm.createBackup(); err != nil {
-		fmt.Printf("警告: 创建备份失败: %v\n", err)
-	}
-
-	// 应用解决后的配置
-	sm.mirrorManager.config = resolvedConfig
-	if err := sm.mirrorManager.saveConfig(); err != nil {
-		return fmt.Errorf("保存解决后的配置失败: %w", err)
-	}
-
-	fmt.Printf("✅ 冲突已自动解决（智能合并）\n")
-	fmt.Printf("   - 优先保留本地配置修改（URL、模型名等）\n")
-	fmt.Printf("   - 保留了本地API密钥\n")
-	fmt.Printf("   - 合并了云端新增的镜像源\n\n")
-
-	// 现在推送合并后的配置
-	return sm.performPush(ConfigFileName)
-}
 
 // performPush 执行实际的推送操作.
 func (sm *SyncManager) performPush(filename string) error {
@@ -452,6 +398,16 @@ func (sm *SyncManager) FetchRemoteSyncData() (*SyncData, error) {
 
 // handleConflicts 处理配置冲突.
 func (sm *SyncManager) handleConflicts(resolver *ConflictResolver, conflicts *ConflictResolution, strategy string, syncData *SyncData) error {
+	return sm.executeConflictResolution(resolver, conflicts, strategy, syncData, false)
+}
+
+// handlePushConflicts 处理推送时的配置冲突.
+func (sm *SyncManager) handlePushConflicts(resolver *ConflictResolver, conflicts *ConflictResolution, strategy string, remoteSyncData *SyncData) error {
+	return sm.executeConflictResolution(resolver, conflicts, strategy, remoteSyncData, true)
+}
+
+// executeConflictResolution 执行冲突解决（公共方法，处理推送和拉取的冲突）.
+func (sm *SyncManager) executeConflictResolution(resolver *ConflictResolver, conflicts *ConflictResolution, strategy string, syncData *SyncData, isPush bool) error {
 	fmt.Printf("⚠️  检测到配置冲突\n\n")
 	fmt.Printf("%s", resolver.FormatConflicts(conflicts))
 
@@ -467,6 +423,9 @@ func (sm *SyncManager) handleConflicts(resolver *ConflictResolver, conflicts *Co
 		}
 
 		fmt.Printf("✅ 冲突已自动解决（智能合并）\n")
+		if isPush {
+			fmt.Printf("   - 优先保留本地配置修改（URL、模型名等）\n")
+		}
 		fmt.Printf("   - 保留了本地API密钥\n")
 		fmt.Printf("   - 合并了镜像源配置\n")
 		fmt.Printf("   - 新增镜像源需要手动配置API密钥\n")

@@ -66,9 +66,14 @@ coverage
 
 # 项目特定文件
 codex-mirror.exe
+codex-mirror-gui.exe
 codex-mirror
 *.toml.backup
 .trae/
+
+# Wails 生成的文件
+frontend/wailsjs/
+frontend/wailsjs/*
 
 # AI 工具的用户配置和缓存
 .claude/
@@ -79,3 +84,4 @@ CLAUDE.md
 CODEBUDDY.md
 SYNC_FEATURE_HANDOVER.md
 WARP.md
+.zenflow

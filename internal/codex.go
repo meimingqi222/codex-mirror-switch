@@ -757,6 +757,16 @@ func (ccm *CodexConfigManager) GetCurrentAuth() (*CodexAuth, error) {
 	return &auth, nil
 }
 
+// GetConfigPath 获取配置文件路径.
+func (ccm *CodexConfigManager) GetConfigPath() string {
+	return ccm.configPath
+}
+
+// GetAuthPath 获取认证文件路径.
+func (ccm *CodexConfigManager) GetAuthPath() string {
+	return ccm.authPath
+}
+
 // BackupConfig 备份当前配置.
 func (ccm *CodexConfigManager) BackupConfig() error {
 	configDir := filepath.Dir(ccm.configPath)

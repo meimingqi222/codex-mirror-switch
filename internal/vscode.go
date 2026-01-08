@@ -206,3 +206,8 @@ func (vcm *VSCodeConfigManager) RemoveChatGPTConfig() error {
 
 	return nil
 }
+
+// GetSettingsPath 获取设置文件路径.
+func (vcm *VSCodeConfigManager) GetSettingsPath() string {
+	return vcm.settingsPath
+}

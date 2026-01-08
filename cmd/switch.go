@@ -1,7 +1,10 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 
 	"codex-mirror/internal"
@@ -15,7 +18,8 @@ var (
 	vscodeOnly bool
 	noBackup   bool
 	shellFmt   string
-	useEnvVar  bool // 使用环境变量方式设置 Claude 配置（默认使用配置文件）
+	useEnvVar  bool   // 使用环境变量方式设置 Claude 配置（默认使用配置文件）
+	dryRun     bool   // 预览模式，不实际修改配置
 )
 
 // switchCmd 代表switch命令.
@@ -30,22 +34,37 @@ Claude 配置：
 Codex 配置：修改配置文件并设置环境变量
 
 参数：
-  name  要切换到的镜像源名称
+  name  要切换到的镜像源名称（省略时进入交互式选择）
 
 示例：
   codex-mirror switch myclaude              # 使用配置文件方式
   codex-mirror switch myclaude --env        # 使用环境变量方式
   codex-mirror switch mycodex
   codex-mirror switch mycodex --no-backup
+  codex-mirror switch mycodex --dry-run     # 预览切换效果，不实际修改
 
 即时刷新当前终端环境变量：
   eval "$(codex-mirror switch myclaude --shell bash)"
   # zsh 同上；fish: codex-mirror switch myclaude --shell fish | source
   # PowerShell: codex-mirror switch myclaude --shell powershell | iex
 `,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		mirrorName := args[0]
+		var mirrorName string
+
+		// 如果没有提供参数，进入交互式选择
+		if len(args) == 0 {
+			if dryRun {
+				return fmt.Errorf("--dry-run 需要指定镜像源名称")
+			}
+			selected, err := interactiveSelectMirror()
+			if err != nil {
+				return fmt.Errorf("交互式选择失败: %w", err)
+			}
+			mirrorName = selected
+		} else {
+			mirrorName = args[0]
+		}
 
 		// 创建镜像源管理器
 		mm, err := internal.NewMirrorManager()
@@ -53,21 +72,15 @@ Codex 配置：修改配置文件并设置环境变量
 			return fmt.Errorf("错误: %w", err)
 		}
 
-		// 先检查镜像源是否存在，避免对不存在的镜像进行修复
-		_, err = mm.GetMirrorByName(mirrorName)
-		if err != nil {
-			return fmt.Errorf("获取镜像源配置失败: %w", err)
-		}
-
-		// 修复mirrors.toml中的env_key格式
-		if err := mm.FixEnvKeyFormat(); err != nil {
-			return fmt.Errorf("修复env_key格式失败: %w", err)
-		}
-
-		// 重新获取目标镜像源配置（修复后可能已更新）
+		// 先检查镜像源是否存在
 		mirror, err := mm.GetMirrorByName(mirrorName)
 		if err != nil {
 			return fmt.Errorf("获取镜像源配置失败: %w", err)
+		}
+
+		// 预览模式
+		if dryRun {
+			return showDryRunPreview(mm, mirror)
 		}
 
 		// 如果是shell输出模式，只收集环境变量并输出shell导出语句
@@ -191,23 +204,41 @@ func applyCodexConfig(mirror *internal.MirrorConfig) error {
 		return fmt.Errorf("--codex-only 和 --vscode-only 不能同时使用")
 	}
 
-	// 更新Codex CLI配置（除非只更新VS Code）
+	// 并行更新Codex CLI和VS Code配置
+	pt := internal.NewParallelTask()
+
 	if !vscodeOnly {
-		if err := updateCodexConfig(mirror); err != nil {
+		pt.Add(func() error {
+			err := updateCodexConfig(mirror)
+			if err == nil {
+				fmt.Println("[OK] Codex CLI配置已更新")
+			}
 			return err
-		}
-		fmt.Println("[OK] Codex CLI配置已更新")
+		})
 	}
 
-	// 更新VS Code配置（除非只更新Codex CLI）
 	if !codexOnly {
-		if err := updateVSCodeConfig(mirror); err != nil {
+		pt.Add(func() error {
+			err := updateVSCodeConfig(mirror)
+			if err == nil {
+				fmt.Println("[OK] VS Code配置已更新")
+			}
 			return err
-		}
-		fmt.Println("[OK] VS Code配置已更新")
+		})
 	}
 
-	return nil
+	// 等待所有任务完成
+	errs := pt.Wait()
+
+	// 收集错误信息
+	var allErrs []error
+	for _, err := range errs {
+		if err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
+
+	return internal.CombinedError(allErrs)
 }
 
 // updateCodexConfig 更新Codex配置.
@@ -246,6 +277,131 @@ func updateVSCodeConfig(mirror *internal.MirrorConfig) error {
 	return vcm.ApplyMirror(mirror)
 }
 
+// showDryRunPreview 预览切换效果（不实际修改配置）.
+func showDryRunPreview(mm *internal.MirrorManager, mirror *internal.MirrorConfig) error {
+	fmt.Printf("[DRY-RUN] 预览切换到 '%s' (%s)\n\n", mirror.Name, mirror.ToolType)
+
+	switch mirror.ToolType {
+	case internal.ToolTypeClaude:
+		fmt.Println("将修改 Claude Code 配置文件:")
+		ccm, _ := internal.NewClaudeConfigManager()
+		fmt.Printf("  配置文件: %s\n", ccm.GetSettingsPath())
+		fmt.Printf("  %s = %s\n", internal.AnthropicBaseURLEnv, mirror.BaseURL)
+		if mirror.APIKey != "" {
+			fmt.Printf("  %s = %s\n", internal.AnthropicAuthTokenEnv, internal.MaskAPIKey(mirror.APIKey))
+		}
+		if mirror.ModelName != "" {
+			fmt.Printf("  %s = %s\n", internal.AnthropicModelEnv, mirror.ModelName)
+		}
+
+	case internal.ToolTypeCodex:
+		fmt.Println("将修改以下配置:")
+
+		if !vscodeOnly {
+			fmt.Println("  Codex CLI:")
+			ccm, _ := internal.NewCodexConfigManager()
+			fmt.Printf("    配置文件: %s\n", ccm.GetConfigPath())
+			fmt.Printf("    %s = %s\n", mirror.EnvKey, internal.MaskAPIKey(mirror.APIKey))
+		}
+
+		if !codexOnly {
+			fmt.Println("  VS Code:")
+			vcm, _ := internal.NewVSCodeConfigManager()
+			fmt.Printf("    配置文件: %s\n", vcm.GetSettingsPath())
+			fmt.Printf("    chatgpt.apiBase = %s\n", mirror.BaseURL)
+		}
+	}
+
+	fmt.Println("\n将更新的系统配置:")
+	fmt.Printf("  当前镜像源 -> %s\n", mirror.Name)
+
+	return nil
+}
+
+// interactiveSelectMirror 交互式选择镜像源.
+func interactiveSelectMirror() (string, error) {
+	mm, err := internal.NewMirrorManager()
+	if err != nil {
+		return "", err
+	}
+
+	mirrors := mm.ListActiveMirrors()
+	if len(mirrors) == 0 {
+		return "", fmt.Errorf("没有可用的镜像源，请先使用 'codex-mirror add' 添加")
+	}
+
+	fmt.Println("可用镜像源:")
+	fmt.Println("==================================================")
+
+	// 按工具类型分组显示
+	codexMirrors := make([]internal.MirrorConfig, 0)
+	claudeMirrors := make([]internal.MirrorConfig, 0)
+
+	for _, m := range mirrors {
+		switch m.ToolType {
+		case internal.ToolTypeCodex:
+			codexMirrors = append(codexMirrors, m)
+		case internal.ToolTypeClaude:
+			claudeMirrors = append(claudeMirrors, m)
+		}
+	}
+
+	// 显示 Codex 镜像源
+	if len(codexMirrors) > 0 {
+		fmt.Println("【Codex 类型】")
+		for i, m := range codexMirrors {
+			indicator := "  "
+			if mm.GetConfig().CurrentCodex == m.Name {
+				indicator = "* "
+			}
+			keyDisplay := internal.MaskAPIKey(m.APIKey)
+			if keyDisplay == "" {
+				keyDisplay = "(无API密钥)"
+			}
+			fmt.Printf("  %d. %s%s  %s  %s  (%s)\n", i+1, indicator, m.Name, m.BaseURL, keyDisplay, m.ToolType)
+		}
+		fmt.Println()
+	}
+
+	// 显示 Claude 镜像源
+	if len(claudeMirrors) > 0 {
+		fmt.Println("【Claude 类型】")
+		for i, m := range claudeMirrors {
+			indicator := "  "
+			if mm.GetConfig().CurrentClaude == m.Name {
+				indicator = "* "
+			}
+			keyDisplay := internal.MaskAPIKey(m.APIKey)
+			if keyDisplay == "" {
+				keyDisplay = "(无API密钥)"
+			}
+			fmt.Printf("  %d. %s%s  %s  %s  (%s)\n", i+len(codexMirrors)+1, indicator, m.Name, m.BaseURL, keyDisplay, m.ToolType)
+		}
+	}
+
+	fmt.Println("==================================================")
+	fmt.Println("输入编号选择镜像源 (直接回车取消): ")
+
+	reader := bufio.NewReader(os.Stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return "", fmt.Errorf("用户取消操作")
+	}
+
+	// 解析输入
+	idx, err := strconv.Atoi(input)
+	if err != nil || idx < 1 || idx > len(mirrors) {
+		return "", fmt.Errorf("无效的选择，请输入 1-%d 之间的数字", len(mirrors))
+	}
+
+	return mirrors[idx-1].Name, nil
+}
+
 func init() {
 	rootCmd.AddCommand(switchCmd)
 
@@ -255,6 +411,7 @@ func init() {
 	switchCmd.Flags().BoolVar(&noBackup, "no-backup", false, "不备份现有配置")
 	switchCmd.Flags().StringVar(&shellFmt, "shell", "", "输出适配当前shell的导出语句(bash|zsh|fish|powershell|cmd)")
 	switchCmd.Flags().BoolVar(&useEnvVar, "env", false, "Claude类型使用系统环境变量方式（默认使用配置文件）")
+	switchCmd.Flags().BoolVar(&dryRun, "dry-run", false, "预览切换效果，不实际修改配置")
 }
 
 // emitShellExports 将环境变量以指定shell格式输出到stdout。

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codex Mirror Manager</title>
+    <link rel="stylesheet" href="css/app.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="wailsjs/wailsjs/runtime/runtime.js"></script>
+    <script src="js/app.js"></script>
+</head>
+<body>
+    <div x-data="mirrorApp()" x-init="init()" class="app-container">
+        <!-- 头部状态栏 -->
+        <header class="header">
+            <div class="header-left">
+                <h1 class="app-title">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Codex Mirror Manager
+                </h1>
+            </div>
+            <div class="header-right">
+                <button @click="refreshMirrors()" class="btn-icon" title="刷新">
+                    <svg class="icon" :class="{ 'spin': loading }" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- 状态面板 -->
+            <section class="status-panel">
+                <h2 class="section-title">当前状态</h2>
+                <div class="status-grid">
+                    <div class="status-card">
+                        <div class="status-card-header">
+                            <span class="status-card-title">Codex 镜像</span>
+                            <span class="badge badge-codex">Codex</span>
+                        </div>
+                        <div class="status-card-body">
+                            <div class="status-value" x-text="status.currentCodex || '未设置'"></div>
+                            <div class="status-path" x-text="status.codexStatus?.path || ''"></div>
+                        </div>
+                    </div>
+                    <div class="status-card">
+                        <div class="status-card-header">
+                            <span class="status-card-title">Claude 镜像</span>
+                            <span class="badge badge-claude">Claude</span>
+                        </div>
+                        <div class="status-card-body">
+                            <div class="status-value" x-text="status.currentClaude || '未设置'"></div>
+                            <div class="status-path">环境变量</div>
+                        </div>
+                    </div>
+                    <!-- 云同步状态卡片 -->
+                    <div class="status-card status-card-sync">
+                        <div class="status-card-header">
+                            <span class="status-card-title">云同步</span>
+                            <span class="badge" :class="syncStatus.enabled ? 'badge-success' : 'badge-secondary'" x-text="syncStatus.enabled ? '已启用' : '未配置'"></span>
+                        </div>
+                        <div class="status-card-body">
+                            <div class="status-value" x-text="syncStatus.enabled ? (syncStatus.provider || 'GitHub Gist') : '未配置'"></div>
+                            <div class="status-path" x-text="syncStatus.message || ''"></div>
+                        </div>
+                        <div class="status-card-actions">
+                            <!-- 已启用时显示同步操作 -->
+                            <template x-if="syncStatus.enabled">
+                                <div class="sync-actions-group">
+                                    <button @click="syncPull()" :disabled="syncing" class="btn-action-text" title="从云端拉取">
+                                        <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                        <span>拉取</span>
+                                    </button>
+                                    <button @click="syncPush()" :disabled="syncing" class="btn-action-text" title="推送到云端">
+                                        <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 4m4-4v12" />
+                                        </svg>
+                                        <span>推送</span>
+                                    </button>
+                                </div>
+                            </template>
+                            <!-- 设置按钮 -->
+                            <button @click="showSyncSettings()" class="btn-action-text" title="同步设置">
+                                <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                <span>设置</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="config-path">
+                    <span class="label">配置文件:</span>
+                    <span class="value" x-text="status.configPath || ''"></span>
+                </div>
+            </section>
+
+            <!-- 工具栏 -->
+            <section class="toolbar">
+                <div class="toolbar-left">
+                    <select x-model="filterType" class="filter-select">
+                        <option value="all">全部类型</option>
+                        <option value="codex">Codex</option>
+                        <option value="claude">Claude</option>
+                    </select>
+                </div>
+                <div class="toolbar-right">
+                    <button @click="showAddForm()" class="btn-primary">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        添加镜像源
+                    </button>
+                </div>
+            </section>
+
+            <!-- 镜像源列表 -->
+            <section class="mirror-list">
+                <div class="mirror-list-header">
+                    <div class="col-name">名称</div>
+                    <div class="col-type">类型</div>
+                    <div class="col-url">URL</div>
+                    <div class="col-apikey">API Key</div>
+                    <div class="col-status">状态</div>
+                    <div class="col-actions">操作</div>
+                </div>
+
+                <template x-for="mirror in filteredMirrors" :key="mirror.name">
+                    <div class="mirror-item">
+                        <div class="col-name">
+                            <div class="mirror-name" x-text="mirror.name"></div>
+                            <div class="mirror-date" x-text="mirror.last_modified"></div>
+                            <!-- 扩展参数标签 -->
+                            <template x-if="mirror.extra_env && Object.keys(mirror.extra_env).length > 0">
+                                <div class="extra-env-tags" :title="getExtraEnvTooltip(mirror.extra_env)">
+                                    <template x-for="([key, value], index) in Object.entries(mirror.extra_env).slice(0, 2)" :key="key">
+                                        <span class="env-tag" x-text="key"></span>
+                                    </template>
+                                    <span x-show="Object.keys(mirror.extra_env).length > 2" class="env-tag env-tag-more"
+                                          x-text="'+' + (Object.keys(mirror.extra_env).length - 2)"></span>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="col-type">
+                            <span class="badge" :class="'badge-' + mirror.tool_type" x-text="mirror.tool_type"></span>
+                        </div>
+                        <div class="col-url">
+                            <span class="url-text" x-text="mirror.base_url"></span>
+                        </div>
+                        <div class="col-apikey">
+                            <span class="apikey-mask" x-text="mirror.api_key || '(无)'"></span>
+                        </div>
+                        <div class="col-status">
+                            <span x-show="mirror.is_current" class="active-badge">
+                                <svg class="icon-small" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                当前使用
+                            </span>
+                        </div>
+                        <div class="col-actions">
+                            <button @click="duplicateMirror(mirror)" class="btn-action" title="复制配置">
+                                <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                            </button>
+                            <button @click="switchMirror(mirror.name)" :disabled="mirror.is_current" class="btn-action" title="切换到此镜像">
+                                <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                </svg>
+                            </button>
+                            <button @click="editMirror(mirror)" class="btn-action" title="编辑">
+                                <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </button>
+                            <button @click="confirmDeleteMirror(mirror)" class="btn-action btn-danger" title="删除">
+                                <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+
+                <div x-show="filteredMirrors.length === 0" class="empty-state">
+                    <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <p>暂无镜像源配置</p>
+                    <button @click="showAddForm()" class="btn-primary">添加第一个镜像源</button>
+                </div>
+            </section>
+        </main>
+
+        <!-- 添加/编辑表单弹窗 -->
+        <div x-show="showForm" class="modal-overlay" x-transition.opacity>
+            <div class="modal" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-90" x-transition:enter-end="opacity-100 scale-100">
+                <div class="modal-header">
+                    <h2 x-text="formMode === 'add' ? '添加镜像源' : '编辑镜像源'"></h2>
+                    <button @click="hideForm()" class="btn-close">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form @submit.prevent="saveMirror()">
+                        <div class="form-group">
+                            <label class="form-label">名称</label>
+                            <input type="text" x-model="form.name" class="form-input" placeholder="输入镜像源名称" required :disabled="formMode === 'edit'">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">类型</label>
+                            <select x-model="form.tool_type" class="form-input" required :disabled="formMode === 'edit'">
+                                <option value="codex">Codex</option>
+                                <option value="claude">Claude</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">API 地址</label>
+                            <input type="url" x-model="form.base_url" class="form-input" placeholder="https://api.example.com" required>
+                            <span x-show="errors.base_url" class="form-error" x-text="errors.base_url"></span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">API Key (可选)</label>
+                            <input type="password" x-model="form.api_key" class="form-input" placeholder="sk-...">
+                        </div>
+                        <div class="form-group" x-show="form.tool_type === 'codex'">
+                            <label class="form-label">模型名称 (可选)</label>
+                            <input type="text" x-model="form.model_name" class="form-input" placeholder="gpt-5.1">
+                            <span class="form-hint">默认使用 gpt-5.1，可自定义其他模型</span>
+                        </div>
+                        <div class="form-group" x-show="form.tool_type === 'claude'">
+                            <label class="form-label">模型名称 (可选)</label>
+                            <input type="text" x-model="form.model_name" class="form-input" placeholder="claude-3-5-sonnet-20241022">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">扩展参数 (可选)</label>
+                            <div class="extra-env-list">
+                                <template x-for="(env, index) in form.extra_env" :key="index">
+                                    <div class="extra-env-item">
+                                        <input type="text" x-model="env.key" class="form-input env-key-input" placeholder="变量名">
+                                        <input type="text" x-model="env.value" class="form-input env-value-input" placeholder="变量值">
+                                        <button type="button" @click="removeExtraEnv(index)" class="btn-icon" title="删除">
+                                            <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+                            <button type="button" @click="addExtraEnv()" class="btn-secondary btn-small">
+                                <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                                添加扩展参数
+                            </button>
+                            <span class="form-hint">用于配置额外的环境变量，如 CODEX_API_BASE_URL 等</span>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" @click="hideForm()" class="btn-secondary">取消</button>
+                            <button type="submit" class="btn-primary" :disabled="saving">
+                                <span x-show="saving">保存中...</span>
+                                <span x-show="!saving">保存</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 确认删除弹窗 -->
+        <div x-show="showDeleteConfirm" class="modal-overlay" x-transition.opacity>
+            <div class="modal modal-small">
+                <div class="modal-header">
+                    <h2>确认删除</h2>
+                    <button @click="hideDeleteConfirm()" class="btn-close">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>确定要删除镜像源 "<span x-text="deleteTarget?.name"></span>" 吗？</p>
+                    <p class="text-warning">此操作无法撤销。</p>
+                    <div class="modal-footer">
+                        <button @click="hideDeleteConfirm()" class="btn-secondary">取消</button>
+                        <button @click="deleteMirror()" class="btn-danger">删除</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 云同步设置弹窗 -->
+        <div x-show="showSyncModal" class="modal-overlay" x-transition.opacity>
+            <div class="modal">
+                <div class="modal-header">
+                    <h2>云同步设置</h2>
+                    <button @click="hideSyncModal()" class="btn-close">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <!-- 未初始化状态 -->
+                    <div x-show="!syncStatus.enabled">
+                        <h3>初始化云同步</h3>
+                        <p class="form-hint">使用 GitHub Gist 存储配置，支持多设备同步。所有数据使用 AES-256 加密。</p>
+
+                        <div class="form-group">
+                            <label class="form-label">GitHub Token</label>
+                            <input type="password" x-model="syncForm.token" class="form-input" placeholder="ghp_xxxxxxxxxxxx">
+                            <span class="form-hint">需要 gist 权限的 GitHub Personal Access Token</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">加密密码</label>
+                            <input type="password" x-model="syncForm.password" class="form-input" placeholder="至少8位">
+                            <span class="form-hint">用于加密云端数据，请妥善保管</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Gist ID (可选)</label>
+                            <input type="text" x-model="syncForm.gistId" class="form-input" placeholder="连接到现有配置">
+                            <span class="form-hint">如果已在其他设备初始化，填写现有 Gist ID 可连接</span>
+                        </div>
+                        <div class="modal-footer">
+                            <button @click="hideSyncModal()" class="btn-secondary">取消</button>
+                            <button @click="initSync()" :disabled="syncing" class="btn-primary">
+                                <span x-show="syncing">初始化中...</span>
+                                <span x-show="!syncing">初始化</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 已初始化状态 -->
+                    <div x-show="syncStatus.enabled">
+                        <h3>同步状态</h3>
+                        <div class="sync-info">
+                            <div class="sync-info-item">
+                                <span class="label">提供商:</span>
+                                <span class="value" x-text="syncStatus.provider || 'GitHub Gist'"></span>
+                            </div>
+                            <div class="sync-info-item">
+                                <span class="label">设备ID:</span>
+                                <span class="value" x-text="syncStatus.deviceId || ''"></span>
+                            </div>
+                            <div class="sync-info-item" x-show="syncStatus.gistId">
+                                <span class="label">Gist ID:</span>
+                                <span class="value sync-gist-id" x-text="syncStatus.gistId"></span>
+                                <button @click="copyGistId()" class="btn-icon-small" title="复制">
+                                    <svg class="icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="sync-info-item" x-show="syncStatus.lastSync">
+                                <span class="label">上次同步:</span>
+                                <span class="value" x-text="syncStatus.lastSync"></span>
+                            </div>
+                        </div>
+
+                        <!-- 修改设置 -->
+                        <h3>修改设置</h3>
+                        <div class="form-group">
+                            <label class="form-label">更换 Gist ID</label>
+                            <input type="text" x-model="syncForm.newGistId" class="form-input" placeholder="新的 Gist ID">
+                            <span class="form-hint">填写后可切换到其他 Gist（需要重新推送）</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">更换加密密码</label>
+                            <input type="password" x-model="syncForm.newPassword" class="form-input" placeholder="新密码（至少8位）">
+                            <span class="form-hint">更换密码后需要重新推送配置</span>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button @click="hideSyncModal()" class="btn-secondary">关闭</button>
+                            <button @click="updateSyncSettings()" :disabled="syncing" class="btn-primary">
+                                <span x-show="syncing">更新中...</span>
+                                <span x-show="!syncing">更新设置</span>
+                            </button>
+                            <button @click="disableSync()" :disabled="syncing" class="btn-danger">
+                                <span x-show="syncing">处理中...</span>
+                                <span x-show="!syncing">禁用同步</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 通知提示 -->
+        <div class="toast-container">
+            <template x-for="toast in toasts" :key="toast.id">
+                <div class="toast" :class="'toast-' + toast.type" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-x-full" x-transition:enter-end="opacity-100 translate-x-0">
+                    <svg x-show="toast.type === 'success'" class="toast-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <svg x-show="toast.type === 'error'" class="toast-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span x-text="toast.message"></span>
+                </div>
+            </template>
+        </div>
+    </div>
+</body>
+</html>

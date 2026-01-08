@@ -1,0 +1,23 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "Codex Mirror",
+  "outputfilename": "codex-mirror-gui",
+  "frontend:install": "cmd.exe /c exit 0",
+  "frontend:build": "cmd.exe /c exit 0",
+  "frontend:dev:watcher": "cmd.exe /c exit 0",
+  "frontend:dev:serverUrl": "",
+  "author": {
+    "name": "Codex Mirror",
+    "email": "info@example.com"
+  },
+  "info": {
+    "companyName": "Codex Mirror",
+    "productName": "Codex Mirror Manager",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright............",
+    "comments": "Codex/Claude镜像源管理工具"
+  },
+  "wailsjsdir": "./frontend/wailsjs",
+  "version": "2",
+  "outputType": "desktop"
+}
