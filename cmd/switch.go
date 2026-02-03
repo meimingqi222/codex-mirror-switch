@@ -18,8 +18,8 @@ var (
 	vscodeOnly bool
 	noBackup   bool
 	shellFmt   string
-	useEnvVar  bool   // 使用环境变量方式设置 Claude 配置（默认使用配置文件）
-	dryRun     bool   // 预览模式，不实际修改配置
+	useEnvVar  bool // 使用环境变量方式设置 Claude 配置（默认使用配置文件）
+	dryRun     bool // 预览模式，不实际修改配置
 )
 
 // switchCmd 代表switch命令.

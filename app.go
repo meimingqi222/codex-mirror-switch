@@ -19,25 +19,25 @@ type App struct {
 type MirrorDTO struct {
 	Name         string            `json:"name"`
 	BaseURL      string            `json:"base_url"`
-	APIKey       string            `json:"api_key"`       // 前端显示掩码
-	HasAPIKey    bool              `json:"has_api_key"`   // 是否有 API Key
-	EnvKey       string            `json:"env_key"`       // 环境变量key
-	ToolType     string            `json:"tool_type"`     // "codex" 或 "claude"
+	APIKey       string            `json:"api_key"`     // 前端显示掩码
+	HasAPIKey    bool              `json:"has_api_key"` // 是否有 API Key
+	EnvKey       string            `json:"env_key"`     // 环境变量key
+	ToolType     string            `json:"tool_type"`   // "codex" 或 "claude"
 	ModelName    string            `json:"model_name"`
 	ExtraEnv     map[string]string `json:"extra_env"`
-	IsCurrent    bool              `json:"is_current"`     // 是否当前激活
+	IsCurrent    bool              `json:"is_current"` // 是否当前激活
 	CreatedAt    string            `json:"created_at"`
 	LastModified string            `json:"last_modified"`
 }
 
 // StatusDTO 状态数据传输对象
 type StatusDTO struct {
-	CurrentCodex  string        `json:"current_codex"`
-	CurrentClaude string        `json:"current_claude"`
-	CodexStatus   ConfigStatus  `json:"codex_status"`
-	ClaudeStatus  ConfigStatus  `json:"claude_status"`
-	VSCodeStatus  ConfigStatus  `json:"vscode_status"`
-	ConfigPath    string        `json:"config_path"`
+	CurrentCodex  string       `json:"current_codex"`
+	CurrentClaude string       `json:"current_claude"`
+	CodexStatus   ConfigStatus `json:"codex_status"`
+	ClaudeStatus  ConfigStatus `json:"claude_status"`
+	VSCodeStatus  ConfigStatus `json:"vscode_status"`
+	ConfigPath    string       `json:"config_path"`
 }
 
 // ConfigStatus 配置状态

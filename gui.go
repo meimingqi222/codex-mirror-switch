@@ -29,10 +29,10 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		OnStartup:        app.Startup,
-		OnShutdown:       app.Shutdown,
-		OnDomReady:       app.DomReady,
-		OnBeforeClose:    app.BeforeClose,
+		OnStartup:     app.Startup,
+		OnShutdown:    app.Shutdown,
+		OnDomReady:    app.DomReady,
+		OnBeforeClose: app.BeforeClose,
 		Bind: []interface{}{
 			app,
 		},

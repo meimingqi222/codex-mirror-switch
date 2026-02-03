@@ -232,8 +232,6 @@ func (sm *SyncManager) PushWithStrategy(strategy string) error {
 	return sm.performPush(filename)
 }
 
-
-
 // performPush 执行实际的推送操作.
 func (sm *SyncManager) performPush(filename string) error {
 	// 导出同步数据
