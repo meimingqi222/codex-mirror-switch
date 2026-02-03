@@ -32,6 +32,7 @@ function mirrorApp() {
         // 表单状态
         showForm: false,
         formMode: 'add',
+        originalAPIKey: '', // 保存编辑时的原始API Key
         form: {
             name: '',
             base_url: '',
@@ -111,6 +112,7 @@ function mirrorApp() {
         // 显示添加表单
         showAddForm() {
             this.formMode = 'add';
+            this.originalAPIKey = ''; // 清空原始API Key
             this.form = {
                 name: '',
                 base_url: '',
@@ -136,6 +138,7 @@ function mirrorApp() {
         // 复制镜像配置（基于现有配置创建新的）
         async duplicateMirror(mirror) {
             this.formMode = 'add';
+            this.originalAPIKey = ''; // 复制时不需要保留原始API Key
             // 获取完整的镜像信息
             try {
                 const fullMirror = await window.go.main.App.GetMirror(mirror.name);
@@ -182,6 +185,8 @@ function mirrorApp() {
             // 获取完整的镜像信息（包括未掩码的 API Key）
             try {
                 const fullMirror = await window.go.main.App.GetMirror(mirror.name);
+                // 保存原始API Key用于后续比较
+                this.originalAPIKey = fullMirror.api_key || '';
                 // 转换 extra_env 对象为数组
                 const extraEnvArray = [];
                 if (fullMirror.extra_env) {
@@ -192,12 +197,13 @@ function mirrorApp() {
                 this.form = {
                     name: fullMirror.name,
                     base_url: fullMirror.base_url,
-                    api_key: fullMirror.has_api_key ? '***' : '',
+                    api_key: fullMirror.has_api_key ? '***' : '', // 显示掩码
                     tool_type: fullMirror.tool_type,
                     model_name: fullMirror.model_name || '',
                     extra_env: extraEnvArray
                 };
             } catch (error) {
+                this.originalAPIKey = '';
                 this.form = {
                     name: mirror.name,
                     base_url: mirror.base_url,
@@ -214,6 +220,7 @@ function mirrorApp() {
         // 隐藏表单
         hideForm() {
             this.showForm = false;
+            this.originalAPIKey = ''; // 清理原始API Key
             this.form = {
                 name: '',
                 base_url: '',
@@ -249,11 +256,26 @@ function mirrorApp() {
                 return;
             }
 
+            // 处理 API Key 更新逻辑
+            let apiKeyToUpdate = this.form.api_key;
+            
+            // 如果是编辑模式且API Key显示为掩码且用户没有修改，则使用原始API Key
+            if (this.formMode === 'edit' && this.form.api_key === '***' && this.originalAPIKey) {
+                apiKeyToUpdate = this.originalAPIKey; // 保持原来的API Key
+            }
+            // 如果用户清空了API Key字段，则传递空字符串
+            else if (this.form.api_key === '') {
+                apiKeyToUpdate = '';
+            }
+            // 如果用户输入了新的API Key，则使用新值
+
             // 将 extra_env 数组转换为对象
             const mirrorData = {
                 ...this.form,
+                api_key: apiKeyToUpdate, // 使用处理后的API Key
                 extra_env: {}
             };
+            
             // 过滤掉空 key 的扩展参数
             this.form.extra_env.forEach(env => {
                 if (env.key && env.key.trim()) {
