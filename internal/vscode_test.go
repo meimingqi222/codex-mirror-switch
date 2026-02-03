@@ -626,7 +626,7 @@ func TestLoadSettingsWithJSONCComments(t *testing.T) {
 }`
 
 	// 首先测试移除注释功能
-	cleanedJSON := removeJSONComments(jsoncContent)
+	cleanedJSON := RemoveJSONComments(jsoncContent)
 	t.Logf("Cleaned JSON: %q", cleanedJSON)
 
 	// 验证移除注释后的JSON是有效的
@@ -718,9 +718,9 @@ line2 */`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := removeJSONComments(tt.input)
+			result := RemoveJSONComments(tt.input)
 			if result != tt.expected {
-				t.Errorf("removeJSONComments() = %q, expected %q", result, tt.expected)
+				t.Errorf("RemoveJSONComments() = %q, expected %q", result, tt.expected)
 			}
 
 			// Verify the result is valid JSON (for non-empty cases that form complete JSON)

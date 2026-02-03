@@ -1,10 +1,12 @@
 package internal
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // VSCodeConfigManager VS Code配置管理器.
@@ -49,11 +51,106 @@ func (vcm *VSCodeConfigManager) LoadSettings() (map[string]interface{}, error) {
 		}
 	}()
 
-	if err := json.NewDecoder(file).Decode(&settings); err != nil {
+	// 读取文件内容
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(file); err != nil {
+		return nil, fmt.Errorf("读取VS Code设置文件失败: %v", err)
+	}
+
+	// 移除JSONC注释（支持 // 和 /* */）
+	cleanedJSON := removeJSONComments(buf.String())
+
+	// 解析JSON
+	if err := json.Unmarshal([]byte(cleanedJSON), &settings); err != nil {
 		return nil, fmt.Errorf("解析VS Code设置文件失败: %v", err)
 	}
 
 	return settings, nil
+}
+
+// RemoveJSONComments 移除JSONC注释（// 和 /* */）
+func RemoveJSONComments(jsonStr string) string {
+	var result strings.Builder
+	runes := []rune(jsonStr)
+	n := len(runes)
+
+	inString := false
+	escapeNext := false
+	inSingleLineComment := false
+	inMultiLineComment := false
+
+	for i := 0; i < n; i++ {
+		c := runes[i]
+
+		// 处理转义字符
+		if escapeNext {
+			result.WriteRune(c)
+			escapeNext = false
+			continue
+		}
+
+		// 字符串内部的转义
+		if inString && c == '\\' {
+			result.WriteRune(c)
+			escapeNext = true
+			continue
+		}
+
+		// 处理字符串字面量
+		if c == '"' && !inSingleLineComment && !inMultiLineComment {
+			inString = !inString
+			result.WriteRune(c)
+			continue
+		}
+
+		// 在字符串内时，直接输出字符
+		if inString {
+			result.WriteRune(c)
+			continue
+		}
+
+		// 处理单行注释 //
+		if i+1 < n && c == '/' && runes[i+1] == '/' && !inMultiLineComment {
+			inSingleLineComment = true
+			continue
+		}
+
+		// 处理多行注释 /*
+		if i+1 < n && c == '/' && runes[i+1] == '*' && !inSingleLineComment {
+			inMultiLineComment = true
+			i++ // 跳过 *
+			continue
+		}
+
+		// 单行注释结束（遇到换行）
+		if inSingleLineComment && c == '\n' {
+			inSingleLineComment = false
+			result.WriteRune(c)
+			continue
+		}
+
+		// 多行注释结束
+		if inMultiLineComment && i+1 < n && c == '*' && runes[i+1] == '/' {
+			inMultiLineComment = false
+			i++ // 跳过 /
+			continue
+		}
+
+		// 在注释内时跳过
+		if inSingleLineComment || inMultiLineComment {
+			continue
+		}
+
+		// 其他字符直接输出
+		result.WriteRune(c)
+	}
+
+	resultStr := strings.TrimSpace(result.String())
+	if resultStr == "" {
+		return "{}"
+	}
+
+	return resultStr
 }
 
 // SaveSettings 保存VS Code设置（使用原子写入）.
@@ -126,7 +223,7 @@ func (vcm *VSCodeConfigManager) ApplyMirror(mirror *MirrorConfig) error {
 	if mirror.ModelName != "" {
 		chatgptConfig["model"] = mirror.ModelName
 	} else {
-		chatgptConfig["model"] = "gpt-4o"
+		chatgptConfig["model"] = DefaultModelGPT4
 	}
 	chatgptConfig["model_reasoning_effort"] = "medium"
 	chatgptConfig["wire_api"] = "messages"
