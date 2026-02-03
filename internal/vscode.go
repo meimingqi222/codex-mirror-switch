@@ -58,7 +58,7 @@ func (vcm *VSCodeConfigManager) LoadSettings() (map[string]interface{}, error) {
 	}
 
 	// 移除JSONC注释（支持 // 和 /* */）
-	cleanedJSON := removeJSONComments(buf.String())
+	cleanedJSON := RemoveJSONComments(buf.String())
 
 	// 解析JSON
 	if err := json.Unmarshal([]byte(cleanedJSON), &settings); err != nil {
