@@ -68,7 +68,9 @@ func (vcm *VSCodeConfigManager) LoadSettings() (map[string]interface{}, error) {
 	return settings, nil
 }
 
-// RemoveJSONComments 移除JSONC注释（// 和 /* */）
+// RemoveJSONComments 移除JSONC注释（// 和 /* */）.
+//
+//nolint:gocyclo // Complex state machine for JSONC parsing.
 func RemoveJSONComments(jsonStr string) string {
 	var result strings.Builder
 	runes := []rune(jsonStr)

@@ -278,7 +278,7 @@ func updateVSCodeConfig(mirror *internal.MirrorConfig) error {
 }
 
 // showDryRunPreview 预览切换效果（不实际修改配置）.
-func showDryRunPreview(mm *internal.MirrorManager, mirror *internal.MirrorConfig) error {
+func showDryRunPreview(_ *internal.MirrorManager, mirror *internal.MirrorConfig) error {
 	fmt.Printf("[DRY-RUN] 预览切换到 '%s' (%s)\n\n", mirror.Name, mirror.ToolType)
 
 	switch mirror.ToolType {
@@ -337,19 +337,20 @@ func interactiveSelectMirror() (string, error) {
 	codexMirrors := make([]internal.MirrorConfig, 0)
 	claudeMirrors := make([]internal.MirrorConfig, 0)
 
-	for _, m := range mirrors {
-		switch m.ToolType {
+	for i := range mirrors {
+		switch mirrors[i].ToolType {
 		case internal.ToolTypeCodex:
-			codexMirrors = append(codexMirrors, m)
+			codexMirrors = append(codexMirrors, mirrors[i])
 		case internal.ToolTypeClaude:
-			claudeMirrors = append(claudeMirrors, m)
+			claudeMirrors = append(claudeMirrors, mirrors[i])
 		}
 	}
 
 	// 显示 Codex 镜像源
 	if len(codexMirrors) > 0 {
 		fmt.Println("【Codex 类型】")
-		for i, m := range codexMirrors {
+		for i := range codexMirrors {
+			m := codexMirrors[i]
 			indicator := "  "
 			if mm.GetConfig().CurrentCodex == m.Name {
 				indicator = "* "
@@ -366,7 +367,8 @@ func interactiveSelectMirror() (string, error) {
 	// 显示 Claude 镜像源
 	if len(claudeMirrors) > 0 {
 		fmt.Println("【Claude 类型】")
-		for i, m := range claudeMirrors {
+		for i := range claudeMirrors {
+			m := claudeMirrors[i]
 			indicator := "  "
 			if mm.GetConfig().CurrentClaude == m.Name {
 				indicator = "* "

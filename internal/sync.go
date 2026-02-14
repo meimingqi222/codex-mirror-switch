@@ -672,6 +672,27 @@ func (sm *SyncManager) applySyncData(syncData *SyncData) error {
 		newMirrors = append(newMirrors, newMirror)
 	}
 
+	// 处理云端已删除的镜像源
+	for di := range syncData.DeletedMirrors {
+		deletedMirror := &syncData.DeletedMirrors[di]
+		found := false
+		for i := range newMirrors {
+			if newMirrors[i].Name != deletedMirror.Name {
+				continue
+			}
+			newMirrors[i].Deleted = true
+			newMirrors[i].DeletedAt = deletedMirror.DeletedAt
+			found = true
+			fmt.Printf("🗑️  同步删除镜像源: %s\n", deletedMirror.Name)
+			break
+		}
+		if !found {
+			deletedMirror.Deleted = true
+			newMirrors = append(newMirrors, *deletedMirror)
+			fmt.Printf("🗑️  同步删除镜像源: %s\n", deletedMirror.Name)
+		}
+	}
+
 	// 更新配置
 	sm.mirrorManager.config.Mirrors = newMirrors
 
@@ -682,6 +703,9 @@ func (sm *SyncManager) applySyncData(syncData *SyncData) error {
 	if sm.mirrorManager.config.CurrentClaude == "" && syncData.CurrentClaude != "" {
 		sm.mirrorManager.config.CurrentClaude = syncData.CurrentClaude
 	}
+
+	// 检查当前激活的镜像源是否已被删除，如果是则切换到默认
+	sm.switchToDefaultIfDeleted()
 
 	// 保存配置
 	if err := sm.mirrorManager.saveConfig(); err != nil {
@@ -1051,4 +1075,31 @@ func (sm *SyncManager) confirmChanges() bool {
 // GetCryptoManager 获取加密管理器.
 func (sm *SyncManager) GetCryptoManager() *CryptoManager {
 	return sm.crypto
+}
+
+// switchToDefaultIfDeleted 检查当前激活的镜像源是否已被删除，如果是则切换到默认.
+func (sm *SyncManager) switchToDefaultIfDeleted() {
+	// 检查 Codex 镜像源
+	if sm.mirrorManager.config.CurrentCodex != "" {
+		for i := range sm.mirrorManager.config.Mirrors {
+			mirror := &sm.mirrorManager.config.Mirrors[i]
+			if mirror.Name == sm.mirrorManager.config.CurrentCodex && mirror.Deleted {
+				fmt.Printf("⚠️  当前Codex镜像源 '%s' 已被删除，切换到默认\n", sm.mirrorManager.config.CurrentCodex)
+				sm.mirrorManager.config.CurrentCodex = ""
+				break
+			}
+		}
+	}
+
+	// 检查 Claude 镜像源
+	if sm.mirrorManager.config.CurrentClaude != "" {
+		for i := range sm.mirrorManager.config.Mirrors {
+			mirror := &sm.mirrorManager.config.Mirrors[i]
+			if mirror.Name == sm.mirrorManager.config.CurrentClaude && mirror.Deleted {
+				fmt.Printf("⚠️  当前Claude镜像源 '%s' 已被删除，切换到默认\n", sm.mirrorManager.config.CurrentClaude)
+				sm.mirrorManager.config.CurrentClaude = ""
+				break
+			}
+		}
+	}
 }

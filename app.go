@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -9,13 +10,13 @@ import (
 	"codex-mirror/internal"
 )
 
-// App GUI 应用结构体，封装 internal 包调用
+// App GUI 应用结构体，封装 internal 包调用.
 type App struct {
 	mirrorManager *internal.MirrorManager
 	configPath    string
 }
 
-// MirrorDTO 镜像源数据传输对象
+// MirrorDTO 镜像源数据传输对象.
 type MirrorDTO struct {
 	Name         string            `json:"name"`
 	BaseURL      string            `json:"base_url"`
@@ -30,7 +31,7 @@ type MirrorDTO struct {
 	LastModified string            `json:"last_modified"`
 }
 
-// StatusDTO 状态数据传输对象
+// StatusDTO 状态数据传输对象.
 type StatusDTO struct {
 	CurrentCodex  string       `json:"current_codex"`
 	CurrentClaude string       `json:"current_claude"`
@@ -40,14 +41,14 @@ type StatusDTO struct {
 	ConfigPath    string       `json:"config_path"`
 }
 
-// ConfigStatus 配置状态
+// ConfigStatus 配置状态.
 type ConfigStatus struct {
 	Exists bool   `json:"exists"`
 	Path   string `json:"path"`
 	Error  string `json:"error,omitempty"`
 }
 
-// NewApp 创建 App 实例
+// NewApp 创建 App 实例.
 func NewApp() (*App, error) {
 	mm, err := internal.NewMirrorManager()
 	if err != nil {
@@ -59,19 +60,19 @@ func NewApp() (*App, error) {
 	}, nil
 }
 
-// ListMirrors 获取所有镜像源
+// ListMirrors 获取所有镜像源.
 func (a *App) ListMirrors() []MirrorDTO {
 	mirrors := a.mirrorManager.ListActiveMirrors()
 	config := a.mirrorManager.GetConfig()
 
 	result := make([]MirrorDTO, 0, len(mirrors))
-	for _, m := range mirrors {
-		result = append(result, a.toMirrorDTO(m, config))
+	for i := range mirrors {
+		result = append(result, a.toMirrorDTO(mirrors[i], config))
 	}
 	return result
 }
 
-// GetMirror 获取指定镜像源
+// GetMirror 获取指定镜像源.
 func (a *App) GetMirror(name string) (MirrorDTO, error) {
 	mirror, err := a.mirrorManager.GetMirrorByName(name)
 	if err != nil {
@@ -80,7 +81,7 @@ func (a *App) GetMirror(name string) (MirrorDTO, error) {
 	return a.toMirrorDTO(*mirror, a.mirrorManager.GetConfig()), nil
 }
 
-// AddMirror 添加镜像源
+// AddMirror 添加镜像源.
 func (a *App) AddMirror(mirror MirrorDTO) error {
 	toolType := internal.ToolType(mirror.ToolType)
 	if toolType == "" {
@@ -97,19 +98,25 @@ func (a *App) AddMirror(mirror MirrorDTO) error {
 	)
 }
 
-// UpdateMirror 更新镜像源
+// UpdateMirror 更新镜像源.
 func (a *App) UpdateMirror(mirror MirrorDTO) error {
-	// 先检查镜像源是否存在
-	_, err := a.mirrorManager.GetMirrorByName(mirror.Name)
+	originalMirror, err := a.mirrorManager.GetMirrorByName(mirror.Name)
 	if err != nil {
 		return err
 	}
 
-	// 更新镜像源
+	apiKey := mirror.APIKey
+	if isMaskedAPIKey(apiKey) {
+		apiKey = originalMirror.APIKey
+	}
+	if apiKey == "" && mirror.APIKey == "" && !isMaskedAPIKey(mirror.APIKey) {
+		apiKey = ""
+	}
+
 	err = a.mirrorManager.UpdateMirrorFull(
 		mirror.Name,
 		mirror.BaseURL,
-		mirror.APIKey,
+		apiKey,
 		mirror.ModelName,
 		mirror.ToolType,
 	)
@@ -131,12 +138,12 @@ func (a *App) UpdateMirror(mirror MirrorDTO) error {
 	return nil
 }
 
-// RemoveMirror 删除镜像源
+// RemoveMirror 删除镜像源.
 func (a *App) RemoveMirror(name string) error {
 	return a.mirrorManager.RemoveMirror(name)
 }
 
-// SwitchMirror 切换镜像源
+// SwitchMirror 切换镜像源.
 func (a *App) SwitchMirror(name string) error {
 	// 获取镜像源配置
 	mirror, err := a.mirrorManager.GetMirrorByName(name)
@@ -166,7 +173,7 @@ func (a *App) SwitchMirror(name string) error {
 	return nil
 }
 
-// GetCurrentStatus 获取当前状态
+// GetCurrentStatus 获取当前状态.
 func (a *App) GetCurrentStatus() StatusDTO {
 	config := a.mirrorManager.GetConfig()
 
@@ -202,12 +209,12 @@ func (a *App) GetCurrentStatus() StatusDTO {
 	return status
 }
 
-// ValidateURL 验证 URL 格式
+// ValidateURL 验证 URL 格式.
 func (a *App) ValidateURL(url string) error {
 	return internal.ValidateBaseURL(url)
 }
 
-// toMirrorDTO 将 MirrorConfig 转换为 MirrorDTO
+// toMirrorDTO 将 MirrorConfig 转换为 MirrorDTO.
 func (a *App) toMirrorDTO(m internal.MirrorConfig, config *internal.SystemConfig) MirrorDTO {
 	dto := MirrorDTO{
 		Name:         m.Name,
@@ -236,7 +243,7 @@ func (a *App) toMirrorDTO(m internal.MirrorConfig, config *internal.SystemConfig
 	return dto
 }
 
-// maskAPIKey 掩码 API Key
+// maskAPIKey 掩码 API Key.
 func (a *App) maskAPIKey(apiKey string) string {
 	if len(apiKey) <= 8 {
 		return strings.Repeat("*", len(apiKey))
@@ -245,7 +252,19 @@ func (a *App) maskAPIKey(apiKey string) string {
 	return apiKey[:4] + strings.Repeat("*", len(apiKey)-8) + apiKey[len(apiKey)-4:]
 }
 
-// applyCodexConfig 应用配置到 Codex
+func isMaskedAPIKey(key string) bool {
+	if key == "" {
+		return false
+	}
+	if key == strings.Repeat("*", len(key)) {
+		return true
+	}
+	hasStar := strings.Contains(key, "*")
+	hasVisible := strings.ReplaceAll(key, "*", "") != ""
+	return hasStar && hasVisible && (strings.HasPrefix(key, "*") || strings.HasSuffix(key, "*"))
+}
+
+// applyCodexConfig 应用配置到 Codex.
 func (a *App) applyCodexConfig(mirrorName string) error {
 	mirror, err := a.mirrorManager.GetMirrorByName(mirrorName)
 	if err != nil {
@@ -261,7 +280,7 @@ func (a *App) applyCodexConfig(mirrorName string) error {
 	return ccm.ApplyMirror(mirror)
 }
 
-// applyClaudeConfig 应用配置到 Claude
+// applyClaudeConfig 应用配置到 Claude.
 func (a *App) applyClaudeConfig(mirrorName string) error {
 	mirror, err := a.mirrorManager.GetMirrorByName(mirrorName)
 	if err != nil {
@@ -277,41 +296,44 @@ func (a *App) applyClaudeConfig(mirrorName string) error {
 	return ccm.ApplyMirror(mirror)
 }
 
-// GetConfigPath 获取配置文件路径
+// GetConfigPath 获取配置文件路径.
 func (a *App) GetConfigPath() string {
 	return a.configPath
 }
 
-// ExportConfig 导出配置（用于备份）
+// ExportConfig 导出配置（用于备份）.
 func (a *App) ExportConfig() (string, error) {
 	config := a.mirrorManager.GetConfig()
-	// 这里可以返回 JSON 格式的配置
-	return fmt.Sprintf("%+v", config), nil
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("序列化配置失败: %w", err)
+	}
+	return string(data), nil
 }
 
-// Startup 应用启动时的回调
+// Startup 应用启动时的回调.
 func (a *App) Startup(ctx context.Context) {
 	// 初始化操作
 }
 
-// DomReady DOM 加载完成时的回调
+// DomReady DOM 加载完成时的回调.
 func (a *App) DomReady(ctx context.Context) {
 	// DOM 已准备好
 }
 
-// BeforeClose 应用关闭前的回调
+// BeforeClose 应用关闭前的回调.
 func (a *App) BeforeClose(ctx context.Context) (prevent bool) {
 	return false
 }
 
-// Shutdown 应用关闭时的回调
+// Shutdown 应用关闭时的回调.
 func (a *App) Shutdown(ctx context.Context) {
 	// 清理操作
 }
 
 // ============ 云同步相关方法 ============
 
-// SyncStatusDTO 同步状态数据传输对象
+// SyncStatusDTO 同步状态数据传输对象.
 type SyncStatusDTO struct {
 	Enabled      bool   `json:"enabled"`
 	Provider     string `json:"provider"`
@@ -324,26 +346,26 @@ type SyncStatusDTO struct {
 	Message      string `json:"message"`
 }
 
-// SyncInitRequest 初始化同步请求
+// SyncInitRequest 初始化同步请求.
 type SyncInitRequest struct {
 	Token    string `json:"token"`
 	Password string `json:"password"`
 	GistID   string `json:"gist_id,omitempty"`
 }
 
-// SyncUpdateRequest 更新同步设置请求
+// SyncUpdateRequest 更新同步设置请求.
 type SyncUpdateRequest struct {
 	NewPassword string `json:"new_password,omitempty"`
 	NewGistID   string `json:"new_gist_id,omitempty"`
 }
 
-// SyncInitResult 初始化同步结果
+// SyncInitResult 初始化同步结果.
 type SyncInitResult struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
 }
 
-// GetSyncStatus 获取同步状态
+// GetSyncStatus 获取同步状态.
 func (a *App) GetSyncStatus() SyncStatusDTO {
 	config := a.mirrorManager.GetConfig()
 
@@ -374,7 +396,7 @@ func (a *App) GetSyncStatus() SyncStatusDTO {
 	return result
 }
 
-// InitSync 初始化云同步
+// InitSync 初始化云同步.
 func (a *App) InitSync(req SyncInitRequest) SyncInitResult {
 	// 验证参数
 	if req.Token == "" {
@@ -413,7 +435,7 @@ func (a *App) InitSync(req SyncInitRequest) SyncInitResult {
 	}
 }
 
-// SyncPush 推送配置到云端
+// SyncPush 推送配置到云端.
 func (a *App) SyncPush() (string, error) {
 	syncManager := internal.NewSyncManager(a.mirrorManager)
 
@@ -424,7 +446,7 @@ func (a *App) SyncPush() (string, error) {
 	return "配置已推送到云端", nil
 }
 
-// SyncPull 从云端拉取配置
+// SyncPull 从云端拉取配置.
 func (a *App) SyncPull() (string, error) {
 	syncManager := internal.NewSyncManager(a.mirrorManager)
 
@@ -435,7 +457,7 @@ func (a *App) SyncPull() (string, error) {
 	return "配置已从云端拉取", nil
 }
 
-// DisableSync 禁用云同步
+// DisableSync 禁用云同步.
 func (a *App) DisableSync() error {
 	config := a.mirrorManager.GetConfig()
 	if config.Sync == nil {
@@ -446,7 +468,7 @@ func (a *App) DisableSync() error {
 	return a.mirrorManager.SaveConfig()
 }
 
-// EnableSync 启用云同步
+// EnableSync 启用云同步.
 func (a *App) EnableSync() error {
 	config := a.mirrorManager.GetConfig()
 	if config.Sync == nil {
@@ -457,7 +479,7 @@ func (a *App) EnableSync() error {
 	return a.mirrorManager.SaveConfig()
 }
 
-// UpdateSyncSettings 更新同步设置（密码或 Gist ID）
+// UpdateSyncSettings 更新同步设置（密码或 Gist ID）.
 func (a *App) UpdateSyncSettings(req SyncUpdateRequest) SyncInitResult {
 	config := a.mirrorManager.GetConfig()
 	if config.Sync == nil {
@@ -497,7 +519,7 @@ func (a *App) UpdateSyncSettings(req SyncUpdateRequest) SyncInitResult {
 	}
 }
 
-// formatDuration 格式化时间间隔
+// formatDuration 格式化时间间隔.
 func formatDuration(d time.Duration) string {
 	switch {
 	case d < time.Minute:

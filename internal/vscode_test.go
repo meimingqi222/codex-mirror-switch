@@ -107,8 +107,8 @@ func TestLoadSettings(t *testing.T) {
 	// 验证嵌套配置
 	if config, ok := loadedSettings["chatgpt.config"]; ok {
 		if configMap, ok := config.(map[string]interface{}); ok {
-			if model, ok := configMap["model"]; !ok || model != "gpt-4" {
-				t.Errorf("chatgpt.config.model = %v, expected gpt-4", model)
+			if model, ok := configMap["model"]; !ok || model != TestModelGPT4 {
+				t.Errorf("chatgpt.config.model = %v, expected %s", model, TestModelGPT4)
 			}
 		} else {
 			t.Error("chatgpt.config should be a map")
@@ -726,7 +726,7 @@ line2 */`,
 			// Verify the result is valid JSON (for non-empty cases that form complete JSON)
 			if result != "" && result != "{}" && result != " " && result != "\n" && result != "\n " {
 				trimResult := strings.TrimSpace(result)
-				if len(trimResult) > 0 {
+				if trimResult != "" {
 					var js interface{}
 					if err := json.Unmarshal([]byte(trimResult), &js); err != nil {
 						// Some test cases produce incomplete JSON on purpose

@@ -6,7 +6,7 @@ import (
 	"codex-mirror/internal"
 )
 
-// 创建测试用的 App 实例
+// 创建测试用的 App 实例.
 func createTestApp(t *testing.T) *App {
 	t.Helper()
 
@@ -22,7 +22,7 @@ func createTestApp(t *testing.T) *App {
 	}
 }
 
-// TestNewApp 测试 App 构造函数
+// TestNewApp 测试 App 构造函数.
 func TestNewApp(t *testing.T) {
 	app, err := NewApp()
 	if err != nil {
@@ -42,7 +42,7 @@ func TestNewApp(t *testing.T) {
 	}
 }
 
-// TestListMirrors 测试获取镜像源列表
+// TestListMirrors 测试获取镜像源列表.
 func TestListMirrors(t *testing.T) {
 	app := createTestApp(t)
 
@@ -76,7 +76,7 @@ func TestListMirrors(t *testing.T) {
 	}
 }
 
-// TestGetMirror 测试获取单个镜像源
+// TestGetMirror 测试获取单个镜像源.
 func TestGetMirror(t *testing.T) {
 	app := createTestApp(t)
 
@@ -101,7 +101,7 @@ func TestGetMirror(t *testing.T) {
 	}
 }
 
-// TestAddMirror 测试添加镜像源
+// TestAddMirror 测试添加镜像源.
 func TestAddMirror(t *testing.T) {
 	app := createTestApp(t)
 
@@ -137,7 +137,7 @@ func TestAddMirror(t *testing.T) {
 	app.RemoveMirror("test-mirror")
 }
 
-// TestAddMirrorDuplicate 测试添加重复镜像源
+// TestAddMirrorDuplicate 测试添加重复镜像源.
 func TestAddMirrorDuplicate(t *testing.T) {
 	app := createTestApp(t)
 
@@ -163,7 +163,7 @@ func TestAddMirrorDuplicate(t *testing.T) {
 	app.RemoveMirror("duplicate-test")
 }
 
-// TestUpdateMirror 测试更新镜像源
+// TestUpdateMirror 测试更新镜像源.
 func TestUpdateMirror(t *testing.T) {
 	app := createTestApp(t)
 
@@ -200,7 +200,7 @@ func TestUpdateMirror(t *testing.T) {
 	app.RemoveMirror("update-test")
 }
 
-// TestRemoveMirror 测试删除镜像源
+// TestRemoveMirror 测试删除镜像源.
 func TestRemoveMirror(t *testing.T) {
 	app := createTestApp(t)
 
@@ -228,7 +228,7 @@ func TestRemoveMirror(t *testing.T) {
 	}
 }
 
-// TestRemoveOfficialMirror 测试删除官方镜像源（应该失败）
+// TestRemoveOfficialMirror 测试删除官方镜像源（应该失败）.
 func TestRemoveOfficialMirror(t *testing.T) {
 	app := createTestApp(t)
 
@@ -238,7 +238,7 @@ func TestRemoveOfficialMirror(t *testing.T) {
 	}
 }
 
-// TestSwitchMirror 测试切换镜像源
+// TestSwitchMirror 测试切换镜像源.
 func TestSwitchMirror(t *testing.T) {
 	app := createTestApp(t)
 
@@ -266,7 +266,7 @@ func TestSwitchMirror(t *testing.T) {
 	}
 }
 
-// TestGetCurrentStatus 测试获取当前状态
+// TestGetCurrentStatus 测试获取当前状态.
 func TestGetCurrentStatus(t *testing.T) {
 	app := createTestApp(t)
 
@@ -286,7 +286,7 @@ func TestGetCurrentStatus(t *testing.T) {
 	}
 }
 
-// TestValidateURL 测试 URL 验证
+// TestValidateURL 测试 URL 验证.
 func TestValidateURL(t *testing.T) {
 	app := createTestApp(t)
 
@@ -312,7 +312,7 @@ func TestValidateURL(t *testing.T) {
 	}
 }
 
-// TestMaskAPIKey 测试 API Key 掩码
+// TestMaskAPIKey 测试 API Key 掩码.
 func TestMaskAPIKey(t *testing.T) {
 	app := createTestApp(t)
 
@@ -346,7 +346,7 @@ func TestMaskAPIKey(t *testing.T) {
 	}
 }
 
-// 辅助函数：检查字符串是否包含子串
+// 辅助函数：检查字符串是否包含子串.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && indexOf(s, substr) >= 0)
 }
@@ -360,7 +360,7 @@ func indexOf(s, substr string) int {
 	return -1
 }
 
-// TestToMirrorDTO 测试 MirrorConfig 到 MirrorDTO 的转换
+// TestToMirrorDTO 测试 MirrorConfig 到 MirrorDTO 的转换.
 func TestToMirrorDTO(t *testing.T) {
 	app := createTestApp(t)
 
@@ -409,7 +409,7 @@ func TestToMirrorDTO(t *testing.T) {
 	}
 }
 
-// TestMirrorDTOJSON 测试 MirrorDTO 的 JSON 序列化
+// TestMirrorDTOJSON 测试 MirrorDTO 的 JSON 序列化.
 func TestMirrorDTOJSON(t *testing.T) {
 	dto := MirrorDTO{
 		Name:      "json-test",

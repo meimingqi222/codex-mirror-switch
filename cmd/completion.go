@@ -2,11 +2,12 @@ package cmd
 
 import (
 	"bytes"
-	"codex-mirror/internal"
 	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
+
+	"codex-mirror/internal"
 )
 
 // completionCmd 代表 completion 命令.
@@ -114,9 +115,9 @@ func getMirrorNamesForCompletion(toComplete string) []string {
 
 	mirrors := mm.ListActiveMirrors()
 	var names []string
-	for _, m := range mirrors {
-		if hasPrefix(m.Name, toComplete) {
-			names = append(names, m.Name)
+	for i := range mirrors {
+		if hasPrefix(mirrors[i].Name, toComplete) {
+			names = append(names, mirrors[i].Name)
 		}
 	}
 	return names
@@ -127,7 +128,7 @@ func hasPrefix(s, prefix string) bool {
 	if len(s) < len(prefix) {
 		return false
 	}
-	return len(prefix) == 0 || equalFold(s[:len(prefix)], prefix)
+	return prefix == "" || equalFold(s[:len(prefix)], prefix)
 }
 
 // equalFold 比较字符串（不区分大小写）.

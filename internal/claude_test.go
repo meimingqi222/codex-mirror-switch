@@ -100,8 +100,8 @@ func TestClaudeConfigManager_LoadSettings_ExistingFile(t *testing.T) {
 	}
 
 	// 验证 env 字段
-	if settings.Env["ANTHROPIC_BASE_URL"] != "https://api.test.com" {
-		t.Errorf("ANTHROPIC_BASE_URL = %v, expected https://api.test.com", settings.Env["ANTHROPIC_BASE_URL"])
+	if settings.Env["ANTHROPIC_BASE_URL"] != TestAPIURL {
+		t.Errorf("ANTHROPIC_BASE_URL = %v, expected %s", settings.Env["ANTHROPIC_BASE_URL"], TestAPIURL)
 	}
 	if settings.Env["ANTHROPIC_AUTH_TOKEN"] != "test-token" {
 		t.Errorf("ANTHROPIC_AUTH_TOKEN = %v, expected test-token", settings.Env["ANTHROPIC_AUTH_TOKEN"])

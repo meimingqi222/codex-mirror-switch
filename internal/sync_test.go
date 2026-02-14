@@ -1006,9 +1006,517 @@ func TestMockSyncProvider(t *testing.T) {
 	}
 }
 
+// TestSwitchToDefaultIfDeleted 测试当激活的镜像源被删除时自动切换到默认.
+func TestSwitchToDefaultIfDeleted(t *testing.T) {
+	tempDir := setupTestDirWithCleanup(t)
+	mm := createTestMirrorManagerForSync(t, tempDir)
+	sm := NewSyncManager(mm)
+
+	now := time.Now()
+
+	// 设置测试数据：包含活跃和已删除的镜像源
+	mm.config.Mirrors = []MirrorConfig{
+		{
+			Name:         "active-codex",
+			BaseURL:      "https://active-codex.com",
+			APIKey:       "codex-key",
+			ToolType:     ToolTypeCodex,
+			CreatedAt:    now.Add(-2 * time.Hour),
+			LastModified: now.Add(-1 * time.Hour),
+			Deleted:      false,
+		},
+		{
+			Name:         "deleted-codex",
+			BaseURL:      "https://deleted-codex.com",
+			APIKey:       "deleted-key",
+			ToolType:     ToolTypeCodex,
+			CreatedAt:    now.Add(-3 * time.Hour),
+			LastModified: now.Add(-30 * time.Minute),
+			Deleted:      true,
+			DeletedAt:    now.Add(-30 * time.Minute),
+		},
+		{
+			Name:         "active-claude",
+			BaseURL:      "https://active-claude.com",
+			APIKey:       "claude-key",
+			ToolType:     ToolTypeClaude,
+			CreatedAt:    now.Add(-2 * time.Hour),
+			LastModified: now.Add(-1 * time.Hour),
+			Deleted:      false,
+		},
+		{
+			Name:         "deleted-claude",
+			BaseURL:      "https://deleted-claude.com",
+			APIKey:       "deleted-key",
+			ToolType:     ToolTypeClaude,
+			CreatedAt:    now.Add(-3 * time.Hour),
+			LastModified: now.Add(-30 * time.Minute),
+			Deleted:      true,
+			DeletedAt:    now.Add(-30 * time.Minute),
+		},
+	}
+
+	tests := []struct {
+		name               string
+		setupCurrentCodex  string
+		setupCurrentClaude string
+		expectedCodex      string
+		expectedClaude     string
+	}{
+		{
+			name:               "当前Codex已删除，应清空CurrentCodex",
+			setupCurrentCodex:  "deleted-codex",
+			setupCurrentClaude: "active-claude",
+			expectedCodex:      "",
+			expectedClaude:     "active-claude",
+		},
+		{
+			name:               "当前Claude已删除，应清空CurrentClaude",
+			setupCurrentCodex:  "active-codex",
+			setupCurrentClaude: "deleted-claude",
+			expectedCodex:      "active-codex",
+			expectedClaude:     "",
+		},
+		{
+			name:               "两者都已删除，应全部清空",
+			setupCurrentCodex:  "deleted-codex",
+			setupCurrentClaude: "deleted-claude",
+			expectedCodex:      "",
+			expectedClaude:     "",
+		},
+		{
+			name:               "两者都未删除，配置应保持不变",
+			setupCurrentCodex:  "active-codex",
+			setupCurrentClaude: "active-claude",
+			expectedCodex:      "active-codex",
+			expectedClaude:     "active-claude",
+		},
+		{
+			name:               "当前配置为空，应保持为空",
+			setupCurrentCodex:  "",
+			setupCurrentClaude: "",
+			expectedCodex:      "",
+			expectedClaude:     "",
+		},
+		{
+			name:               "当前Codex指向不存在的镜像，应保持不变",
+			setupCurrentCodex:  "nonexistent",
+			setupCurrentClaude: "active-claude",
+			expectedCodex:      "nonexistent", // 不存在的镜像不会触发清空
+			expectedClaude:     "active-claude",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 重置配置
+			mm.config.CurrentCodex = tt.setupCurrentCodex
+			mm.config.CurrentClaude = tt.setupCurrentClaude
+
+			// 调用 switchToDefaultIfDeleted
+			sm.switchToDefaultIfDeleted()
+
+			// 验证结果
+			if mm.config.CurrentCodex != tt.expectedCodex {
+				t.Errorf("CurrentCodex = %v, expected %v", mm.config.CurrentCodex, tt.expectedCodex)
+			}
+
+			if mm.config.CurrentClaude != tt.expectedClaude {
+				t.Errorf("CurrentClaude = %v, expected %v", mm.config.CurrentClaude, tt.expectedClaude)
+			}
+		})
+	}
+}
+
 // 这些函数在sync.go中已定义，这里只是为了测试引用
 
-// TestProviderInfo 测试提供商信息结构.
+// TestApplySyncDataWithDeletions 测试应用同步数据时的删除同步功能.
+func TestApplySyncDataWithDeletions(t *testing.T) {
+	tempDir := setupTestDirWithCleanup(t)
+	mm := createTestMirrorManagerForSync(t, tempDir)
+	sm := NewSyncManager(mm)
+
+	now := time.Now()
+
+	// 创建同步数据：包含需要删除的镜像源
+	syncMirrors := []MirrorConfig{
+		{
+			Name:         "sync-mirror-1",
+			BaseURL:      "https://sync1.com",
+			APIKey:       "sync-key-1",
+			ToolType:     ToolTypeCodex,
+			CreatedAt:    now.Add(-1 * time.Hour),
+			LastModified: now.Add(-30 * time.Minute),
+		},
+		{
+			Name:         "sync-mirror-2",
+			BaseURL:      "https://sync2.com",
+			APIKey:       "sync-key-2",
+			ToolType:     ToolTypeClaude,
+			CreatedAt:    now.Add(-2 * time.Hour),
+			LastModified: now.Add(-1 * time.Hour),
+		},
+	}
+
+	// 云端要求删除 "to-be-deleted-mirror"
+	deletedMirrors := []MirrorConfig{
+		{
+			Name:         "to-be-deleted-mirror",
+			BaseURL:      "https://tobedeleted.com",
+			APIKey:       "delete-key",
+			ToolType:     ToolTypeCodex,
+			CreatedAt:    now.Add(-4 * time.Hour),
+			LastModified: now.Add(-3 * time.Hour),
+			Deleted:      true,
+			DeletedAt:    now.Add(-30 * time.Minute),
+		},
+	}
+
+	// 计算校验和
+	data, _ := json.Marshal(syncMirrors)
+	checksum := calculateChecksum(data)
+
+	syncData := &SyncData{
+		CurrentCodex:   "sync-mirror-1",
+		CurrentClaude:  "sync-mirror-2",
+		Mirrors:        syncMirrors,
+		DeletedMirrors: deletedMirrors,
+		Timestamp:      now,
+		DeviceID:       "remote-device",
+		Version:        "3.1",
+		Checksum:       checksum,
+		HasAPIKeys:     true,
+	}
+
+	err := sm.applySyncData(syncData)
+	if err != nil {
+		t.Fatalf("applySyncData() error = %v", err)
+	}
+
+	// 验证：同步镜像源应该被添加
+	if len(mm.config.Mirrors) != 3 {
+		t.Errorf("Expected 3 mirrors (2 sync + 1 deleted), got %d", len(mm.config.Mirrors))
+	}
+
+	// 验证：同步镜像源应该正确添加
+	foundSyncMirror1 := false
+	foundSyncMirror2 := false
+	for _, mirror := range mm.config.Mirrors {
+		if mirror.Name == "sync-mirror-1" {
+			foundSyncMirror1 = true
+			if mirror.BaseURL != "https://sync1.com" {
+				t.Errorf("sync-mirror-1 BaseURL = %v, expected https://sync1.com", mirror.BaseURL)
+			}
+		}
+		if mirror.Name == "sync-mirror-2" {
+			foundSyncMirror2 = true
+			if mirror.BaseURL != "https://sync2.com" {
+				t.Errorf("sync-mirror-2 BaseURL = %v, expected https://sync2.com", mirror.BaseURL)
+			}
+		}
+	}
+	if !foundSyncMirror1 {
+		t.Error("sync-mirror-1 should be added from sync data")
+	}
+	if !foundSyncMirror2 {
+		t.Error("sync-mirror-2 should be added from sync data")
+	}
+
+	foundDeletedMirror := false
+	for _, mirror := range mm.config.Mirrors {
+		if mirror.Name == "to-be-deleted-mirror" {
+			foundDeletedMirror = true
+			if !mirror.Deleted {
+				t.Error("to-be-deleted-mirror should be marked as Deleted=true")
+			}
+			if mirror.DeletedAt.IsZero() {
+				t.Error("to-be-deleted-mirror should have DeletedAt set")
+			}
+			break
+		}
+	}
+	if !foundDeletedMirror {
+		t.Error("to-be-deleted-mirror should be added to mirrors list and marked as deleted")
+	}
+
+	if mm.config.CurrentCodex != "sync-mirror-1" {
+		t.Errorf("CurrentCodex = %v, expected sync-mirror-1", mm.config.CurrentCodex)
+	}
+	if mm.config.CurrentClaude != "sync-mirror-2" {
+		t.Errorf("CurrentClaude = %v, expected sync-mirror-2", mm.config.CurrentClaude)
+	}
+}
+
+// TestApplySyncDataWithRemoteOnlyDeletions 测试云端删除的镜像源在本地不存在的情况.
+func TestApplySyncDataWithRemoteOnlyDeletions(t *testing.T) {
+	tempDir := setupTestDirWithCleanup(t)
+	mm := createTestMirrorManagerForSync(t, tempDir)
+	sm := NewSyncManager(mm)
+
+	now := time.Now()
+
+	// 创建同步数据：云端没有镜像，但有已删除列表
+	syncMirrors := []MirrorConfig{}
+	deletedMirrors := []MirrorConfig{
+		{
+			Name:         "remote-deleted-mirror",
+			BaseURL:      "https://remotedeleted.com",
+			APIKey:       "deleted-key",
+			ToolType:     ToolTypeCodex,
+			CreatedAt:    now.Add(-2 * time.Hour),
+			LastModified: now.Add(-1 * time.Hour),
+			Deleted:      true,
+			DeletedAt:    now.Add(-30 * time.Minute),
+		},
+	}
+
+	// 计算校验和
+	data, _ := json.Marshal(syncMirrors)
+	checksum := calculateChecksum(data)
+
+	syncData := &SyncData{
+		CurrentCodex:   "",
+		CurrentClaude:  "",
+		Mirrors:        syncMirrors,
+		DeletedMirrors: deletedMirrors,
+		Timestamp:      now,
+		DeviceID:       "remote-device",
+		Version:        "3.1",
+		Checksum:       checksum,
+		HasAPIKeys:     true,
+	}
+
+	err := sm.applySyncData(syncData)
+	if err != nil {
+		t.Fatalf("applySyncData() error = %v", err)
+	}
+
+	if len(mm.config.Mirrors) != 1 {
+		t.Errorf("Expected 1 mirror, got %d", len(mm.config.Mirrors))
+	}
+
+	foundRemoteDeleted := false
+	for _, mirror := range mm.config.Mirrors {
+		if mirror.Name == "remote-deleted-mirror" {
+			foundRemoteDeleted = true
+			if !mirror.Deleted {
+				t.Error("remote-deleted-mirror should be marked as Deleted=true")
+			}
+			break
+		}
+	}
+	if !foundRemoteDeleted {
+		t.Error("remote-deleted-mirror should be added to mirrors list and marked as deleted")
+	}
+}
+
+// TestApplySyncDataWithDeletedCurrentActive 测试当前激活的镜像源被删除的情况.
+func TestApplySyncDataWithDeletedCurrentActive(t *testing.T) {
+	tempDir := setupTestDirWithCleanup(t)
+	mm := createTestMirrorManagerForSync(t, tempDir)
+	sm := NewSyncManager(mm)
+
+	now := time.Now()
+
+	// 预设本地配置，当前激活的镜像源是 "current-mirror"
+	mm.config.CurrentCodex = "current-mirror"
+	mm.config.CurrentClaude = "current-claude"
+	mm.config.Mirrors = []MirrorConfig{
+		{
+			Name:         "current-mirror",
+			BaseURL:      "https://current.com",
+			APIKey:       "current-key",
+			ToolType:     ToolTypeCodex,
+			CreatedAt:    now.Add(-2 * time.Hour),
+			LastModified: now.Add(-1 * time.Hour),
+		},
+		{
+			Name:         "current-claude",
+			BaseURL:      "https://claude.com",
+			APIKey:       "claude-key",
+			ToolType:     ToolTypeClaude,
+			CreatedAt:    now.Add(-2 * time.Hour),
+			LastModified: now.Add(-1 * time.Hour),
+		},
+		{
+			Name:         "other-mirror",
+			BaseURL:      "https://other.com",
+			APIKey:       "other-key",
+			ToolType:     ToolTypeCodex,
+			CreatedAt:    now.Add(-1 * time.Hour),
+			LastModified: now.Add(-30 * time.Minute),
+		},
+	}
+
+	// 同步数据：当前激活的镜像源被标记为删除
+	syncMirrors := []MirrorConfig{
+		{
+			Name:         "other-mirror",
+			BaseURL:      "https://other.com",
+			APIKey:       "other-key",
+			ToolType:     ToolTypeCodex,
+			CreatedAt:    now.Add(-1 * time.Hour),
+			LastModified: now.Add(-30 * time.Minute),
+		},
+	}
+	deletedMirrors := []MirrorConfig{
+		{
+			Name:         "current-mirror",
+			BaseURL:      "https://current.com",
+			ToolType:     ToolTypeCodex,
+			CreatedAt:    now.Add(-2 * time.Hour),
+			LastModified: now.Add(-1 * time.Hour),
+			Deleted:      true,
+			DeletedAt:    now.Add(-30 * time.Minute),
+		},
+	}
+
+	// 计算校验和
+	data, _ := json.Marshal(syncMirrors)
+	checksum := calculateChecksum(data)
+
+	syncData := &SyncData{
+		CurrentCodex:   "current-mirror", // 云端仍然指定这个为当前，但实际已被删除
+		CurrentClaude:  "current-claude",
+		Mirrors:        syncMirrors,
+		DeletedMirrors: deletedMirrors,
+		Timestamp:      now,
+		DeviceID:       "remote-device",
+		Version:        "3.1",
+		Checksum:       checksum,
+		HasAPIKeys:     true,
+	}
+
+	err := sm.applySyncData(syncData)
+	if err != nil {
+		t.Fatalf("applySyncData() error = %v", err)
+	}
+
+	// 验证：当前激活的镜像源被删除后，应该被清空
+	// switchToDefaultIfDeleted 应该被调用并将 CurrentCodex 清空
+	if mm.config.CurrentCodex != "" {
+		t.Errorf("CurrentCodex should be cleared after the active mirror is deleted, got %s", mm.config.CurrentCodex)
+	}
+
+	// CurrentClaude 未受影响
+	if mm.config.CurrentClaude != "current-claude" {
+		t.Errorf("CurrentClaude should remain unchanged, got %s", mm.config.CurrentClaude)
+	}
+
+	// 验证：被删除的镜像源应该被标记为删除
+	for _, mirror := range mm.config.Mirrors {
+		if mirror.Name == "current-mirror" {
+			if !mirror.Deleted {
+				t.Error("current-mirror should be marked as deleted")
+			}
+		}
+	}
+}
+
+// TestApplySyncDataChecksumMismatch 测试校验和不匹配的情况.
+func TestApplySyncDataChecksumMismatch(t *testing.T) {
+	tempDir := setupTestDirWithCleanup(t)
+	mm := createTestMirrorManagerForSync(t, tempDir)
+	sm := NewSyncManager(mm)
+
+	syncMirrors := []MirrorConfig{
+		{
+			Name:         "test-mirror",
+			BaseURL:      "https://test.com",
+			ToolType:     ToolTypeCodex,
+			CreatedAt:    time.Now(),
+			LastModified: time.Now(),
+		},
+	}
+
+	// 使用错误的校验和
+	wrongChecksum := "wrong-checksum-12345"
+
+	syncData := &SyncData{
+		Mirrors:        syncMirrors,
+		DeletedMirrors: []MirrorConfig{},
+		Timestamp:      time.Now(),
+		DeviceID:       "test-device",
+		Version:        "3.1",
+		Checksum:       wrongChecksum,
+		HasAPIKeys:     false,
+	}
+
+	err := sm.applySyncData(syncData)
+	if err == nil {
+		t.Error("applySyncData() should return error when checksum mismatch")
+	}
+
+	// 验证错误信息
+	if !strings.Contains(err.Error(), "校验和") {
+		t.Errorf("Expected checksum error message, got: %v", err.Error())
+	}
+}
+
+// TestApplySyncDataWithEncryptedAPIKey 测试带加密API密钥的应用同步.
+func TestApplySyncDataWithEncryptedAPIKey(t *testing.T) {
+	tempDir := setupTestDirWithCleanup(t)
+	mm := createTestMirrorManagerForSync(t, tempDir)
+	sm := NewSyncManager(mm)
+
+	// 设置加密密码
+	sm.config = &SyncConfig{
+		EncryptionPwd: "test-encryption-password",
+	}
+
+	// 创建带加密API密钥的同步数据
+	testAPIKey := "test-api-key-12345"
+
+	// 加密API密钥
+	encryptedKey, err := sm.encryptAPIKey(testAPIKey)
+	if err != nil {
+		t.Fatalf("encryptAPIKey() error = %v", err)
+	}
+
+	mirrors := []MirrorConfig{
+		{
+			Name:     "encrypted-mirror",
+			BaseURL:  "https://encrypted.com",
+			APIKey:   encryptedKey,
+			ToolType: ToolTypeCodex,
+		},
+	}
+
+	// 计算校验和
+	data, _ := json.Marshal(mirrors)
+	checksum := calculateChecksum(data)
+
+	syncData := &SyncData{
+		Mirrors:      mirrors,
+		CurrentCodex: "encrypted-mirror",
+		Timestamp:    time.Now(),
+		DeviceID:     "test-device",
+		Version:      "3.1",
+		Checksum:     checksum,
+		HasAPIKeys:   true,
+	}
+
+	err = sm.applySyncData(syncData)
+	if err != nil {
+		t.Fatalf("applySyncData() error = %v", err)
+	}
+
+	// 验证：API密钥应该被解密并正确保存
+	found := false
+	for _, mirror := range mm.config.Mirrors {
+		if mirror.Name == "encrypted-mirror" {
+			found = true
+			if mirror.APIKey != testAPIKey {
+				t.Errorf("APIKey should be decrypted, got %v, expected %v", mirror.APIKey, testAPIKey)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("encrypted-mirror should be added")
+	}
+}
+
 func TestProviderInfo(t *testing.T) {
 	info := ProviderInfo{
 		Name:        "test-provider",
