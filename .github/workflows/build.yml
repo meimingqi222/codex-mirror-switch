@@ -63,30 +63,58 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        build:
-          - name: 'codex-mirror-gui'
-            platform: 'linux/amd64'
-            os: 'ubuntu-latest'
-          - name: 'codex-mirror-gui'
-            platform: 'windows/amd64'
-            os: 'windows-latest'
-          - name: 'codex-mirror-gui'
-            platform: 'darwin/universal'
-            os: 'macos-latest'
-    runs-on: ${{ matrix.build.os }}
+        include:
+          - os: 'ubuntu-latest'
+            platform: 'linux'
+            arch: 'amd64'
+          - os: 'windows-latest'
+            platform: 'windows'
+            arch: 'amd64'
+          - os: 'macos-latest'
+            platform: 'darwin'
+            arch: 'universal'
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Build Wails GUI
-        uses: dAppServer/wails-build-action@v2.2
-        id: build
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
         with:
-          build-name: ${{ matrix.build.name }}
-          build-platform: ${{ matrix.build.platform }}
-          package: false
           go-version: '1.24'
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build Wails GUI
+        run: |
+          if [ "${{ matrix.platform }}" = "windows" ]; then
+            wails build -platform windows/amd64 -o codex-mirror-gui.exe
+            mkdir -p release-gui
+            mv codex-mirror-gui.exe release-gui/
+          elif [ "${{ matrix.platform }}" = "darwin" ]; then
+            wails build -platform darwin/universal -o codex-mirror-gui
+            mkdir -p release-gui
+            mv codex-mirror-gui release-gui/
+          else
+            wails build -platform linux/amd64 -o codex-mirror-gui
+            mkdir -p release-gui
+            mv codex-mirror-gui release-gui/
+          fi
+
+      - name: Upload GUI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-mirror-gui-${{ matrix.platform }}-${{ matrix.arch }}
+          path: release-gui/
 
   test:
     runs-on: ubuntu-latest
