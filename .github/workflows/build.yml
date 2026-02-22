@@ -94,21 +94,32 @@ jobs:
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
-      - name: Build Wails GUI
+      - name: Install Linux dependencies
+        if: matrix.platform == 'linux'
         run: |
-          if [ "${{ matrix.platform }}" = "windows" ]; then
-            wails build -platform windows/amd64 -o codex-mirror-gui.exe
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+
+      - name: Build Wails GUI (Linux/macOS)
+        if: matrix.platform != 'windows'
+        run: |
+          if [ "${{ matrix.platform }}" = "darwin" ]; then
+            wails build -platform darwin/universal
             mkdir -p release-gui
-            mv codex-mirror-gui.exe release-gui/
-          elif [ "${{ matrix.platform }}" = "darwin" ]; then
-            wails build -platform darwin/universal -o codex-mirror-gui
-            mkdir -p release-gui
-            mv codex-mirror-gui release-gui/
+            cp -r build/bin/* release-gui/
           else
-            wails build -platform linux/amd64 -o codex-mirror-gui
+            wails build -platform linux/amd64
             mkdir -p release-gui
-            mv codex-mirror-gui release-gui/
+            cp build/bin/* release-gui/
           fi
+
+      - name: Build Wails GUI (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          wails build -platform windows/amd64
+          New-Item -ItemType Directory -Path release-gui -Force
+          Copy-Item -Path build/bin/* -Destination release-gui/ -Recurse
 
       - name: Upload GUI artifacts
         uses: actions/upload-artifact@v4
