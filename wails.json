@@ -2,9 +2,9 @@
   "$schema": "https://wails.io/schemas/config.v2.json",
   "name": "Codex Mirror",
   "outputfilename": "codex-mirror-gui",
-  "frontend:install": "cmd.exe /c exit 0",
-  "frontend:build": "cmd.exe /c exit 0",
-  "frontend:dev:watcher": "cmd.exe /c exit 0",
+  "frontend:install": "echo 'No frontend dependencies to install'",
+  "frontend:build": "echo 'No frontend build step needed'",
+  "frontend:dev:watcher": "echo 'No watcher needed'",
   "frontend:dev:serverUrl": "",
   "author": {
     "name": "Codex Mirror",

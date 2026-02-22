@@ -20,6 +20,22 @@ const (
 	screenAddMirror                  // 添加镜像源屏幕
 	screenRemoveMirror               // 删除镜像源屏幕
 	screenViewStatus                 // 查看状态屏幕
+
+	// 按键常量.
+	keyCtrlC = "ctrl+c"
+	keyDown  = "down"
+	keyEnter = "enter"
+	keyEsc   = "esc"
+
+	// 工具类型常量.
+	toolTypeCodex  = "codex"
+	toolTypeClaude = "claude"
+
+	// UI 常量.
+	errMirrorManagerInit = "错误: 无法初始化镜像管理器\n"
+	uiBorderTop          = "╔══════════════════════════════════════╗\n"
+	uiBorderBottom       = "╚══════════════════════════════════════╝\n\n"
+	uiCursor             = "▶ "
 )
 
 // model 是我们的 TUI 应用状态.
@@ -94,18 +110,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // updateMainMenu 处理主菜单更新.
 func (m model) updateMainMenu(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c", "q":
+	case keyCtrlC, "q":
 		m.quitting = true
 		return m, tea.Quit
 	case "up", "k":
 		if m.cursor > 0 {
 			m.cursor--
 		}
-	case "down", "j":
+	case keyDown, "j":
 		if m.cursor < len(m.choices)-1 {
 			m.cursor++
 		}
-	case "enter":
+	case keyEnter:
 		return m.handleMainMenuChoice()
 	}
 
@@ -136,7 +152,7 @@ func (m model) handleMainMenuChoice() (tea.Model, tea.Cmd) {
 		m.inputName = ""
 		m.inputURL = ""
 		m.inputAPIKey = ""
-		m.inputToolType = "codex"
+		m.inputToolType = toolTypeCodex
 		m.cursor = 0
 	case "删除镜像源":
 		if m.mm != nil {
@@ -155,7 +171,7 @@ func (m model) handleMainMenuChoice() (tea.Model, tea.Cmd) {
 // updateListMirrors 处理列出镜像源屏幕更新.
 func (m model) updateListMirrors(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c", "q", "esc", "b":
+	case keyCtrlC, "q", keyEsc, "b":
 		m.screen = screenMainMenu
 		m.cursor = 0
 		m.scrollOffset = 0
@@ -167,7 +183,7 @@ func (m model) updateListMirrors(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.scrollOffset = m.cursor
 			}
 		}
-	case "down", "j":
+	case keyDown, "j":
 		if m.cursor < len(m.mirrors)-1 {
 			m.cursor++
 			// 调整滚动偏移
@@ -184,18 +200,18 @@ func (m model) updateListMirrors(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // updateSwitchMirror 处理切换镜像源屏幕更新.
 func (m model) updateSwitchMirror(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c", "q", "esc", "b":
+	case keyCtrlC, "q", keyEsc, "b":
 		m.screen = screenMainMenu
 		m.cursor = 0
 	case "up", "k":
 		if m.cursor > 0 {
 			m.cursor--
 		}
-	case "down", "j":
+	case keyDown, "j":
 		if m.cursor < len(m.mirrors)-1 {
 			m.cursor++
 		}
-	case "enter":
+	case keyEnter:
 		if m.mm != nil && len(m.mirrors) > 0 {
 			mirror := m.mirrors[m.cursor]
 			if mirror.Name != internal.DefaultMirrorName || m.canDeleteOfficial() {
@@ -215,23 +231,23 @@ func (m model) updateSwitchMirror(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // updateAddMirror 处理添加镜像源屏幕更新.
 func (m model) updateAddMirror(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c", "q", "esc", "b":
+	case keyCtrlC, "q", keyEsc, "b":
 		m.screen = screenMainMenu
 		m.cursor = 0
-	case "enter":
+	case keyEnter:
 		return m.handleAddMirrorInput()
 	case "backspace":
 		return m.handleAddMirrorBackspace()
 	case "up", "k":
 		if m.inputStep == 3 { // 工具类型选择
-			if m.inputToolType == "claude" {
-				m.inputToolType = "codex"
+			if m.inputToolType == toolTypeClaude {
+				m.inputToolType = toolTypeCodex
 			}
 		}
-	case "down", "j":
+	case keyDown, "j":
 		if m.inputStep == 3 { // 工具类型选择
-			if m.inputToolType == "codex" {
-				m.inputToolType = "claude"
+			if m.inputToolType == toolTypeCodex {
+				m.inputToolType = toolTypeClaude
 			}
 		}
 	default:
@@ -260,7 +276,7 @@ func (m model) handleAddMirrorInput() (tea.Model, tea.Cmd) {
 	case 3: // 选择工具类型
 		if m.mm != nil {
 			var toolType internal.ToolType
-			if m.inputToolType == "codex" {
+			if m.inputToolType == toolTypeCodex {
 				toolType = internal.ToolTypeCodex
 			} else {
 				toolType = internal.ToolTypeClaude
@@ -324,18 +340,18 @@ func (m model) handleAddMirrorChar(char string) (tea.Model, tea.Cmd) {
 // updateRemoveMirror 处理删除镜像源屏幕更新.
 func (m model) updateRemoveMirror(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c", "q", "esc", "b":
+	case keyCtrlC, "q", keyEsc, "b":
 		m.screen = screenMainMenu
 		m.cursor = 0
 	case "up", "k":
 		if m.cursor > 0 {
 			m.cursor--
 		}
-	case "down", "j":
+	case keyDown, "j":
 		if m.cursor < len(m.mirrors)-1 {
 			m.cursor++
 		}
-	case "enter":
+	case keyEnter:
 		if m.mm != nil && len(m.mirrors) > 0 {
 			mirror := m.mirrors[m.cursor]
 			if mirror.Name != internal.DefaultMirrorName {
@@ -361,7 +377,7 @@ func (m model) updateRemoveMirror(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // updateViewStatus 处理查看状态屏幕更新.
 func (m model) updateViewStatus(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c", "q", "esc", "b":
+	case keyCtrlC, "q", keyEsc, "b":
 		m.screen = screenMainMenu
 		m.cursor = 0
 	}
@@ -410,14 +426,14 @@ func (m model) View() string {
 
 // viewMainMenu 渲染主菜单.
 func (m model) viewMainMenu() string {
-	s := "╔══════════════════════════════════════╗\n"
+	s := uiBorderTop
 	s += "║   Codex Mirror Switch TUI            ║\n"
-	s += "╚══════════════════════════════════════╝\n\n"
+	s += uiBorderBottom
 
 	for i, choice := range m.choices {
 		cursor := "  "
 		if m.cursor == i {
-			cursor = "▶ "
+			cursor = uiCursor
 		}
 		s += fmt.Sprintf("%s %s\n", cursor, choice)
 	}
@@ -428,13 +444,13 @@ func (m model) viewMainMenu() string {
 
 // viewListMirrors 渲染镜像源列表.
 func (m model) viewListMirrors() string {
-	s := "╔══════════════════════════════════════╗\n"
+	s := uiBorderTop
 	s += "║         镜像源列表                   ║\n"
-	s += "╚══════════════════════════════════════╝\n\n"
+	s += uiBorderBottom
 
 	switch {
 	case m.mm == nil:
-		s += "错误: 无法初始化镜像管理器\n"
+		s += errMirrorManagerInit
 	case len(m.mirrors) == 0:
 		s += "没有配置的镜像源\n"
 	default:
@@ -449,7 +465,7 @@ func (m model) viewListMirrors() string {
 			mirror := m.mirrors[i]
 			cursor := "  "
 			if m.cursor == i {
-				cursor = "▶ "
+				cursor = uiCursor
 			}
 			current := "  "
 			if m.mm.GetConfig().CurrentCodex == mirror.Name || m.mm.GetConfig().CurrentClaude == mirror.Name {
@@ -482,13 +498,13 @@ func (m model) viewListMirrors() string {
 
 // viewSwitchMirror 渲染切换镜像源屏幕.
 func (m model) viewSwitchMirror() string {
-	s := "╔══════════════════════════════════════╗\n"
+	s := uiBorderTop
 	s += "║       选择要切换的镜像源             ║\n"
-	s += "╚══════════════════════════════════════╝\n\n"
+	s += uiBorderBottom
 
 	switch {
 	case m.mm == nil:
-		s += "错误: 无法初始化镜像管理器\n"
+		s += errMirrorManagerInit
 	case len(m.mirrors) == 0:
 		s += "没有可切换的镜像源\n"
 	default:
@@ -496,7 +512,7 @@ func (m model) viewSwitchMirror() string {
 			mirror := &m.mirrors[i]
 			cursor := "  "
 			if m.cursor == i {
-				cursor = "▶ "
+				cursor = uiCursor
 			}
 			current := "  "
 			if m.mm.GetConfig().CurrentCodex == mirror.Name || m.mm.GetConfig().CurrentClaude == mirror.Name {
@@ -513,9 +529,9 @@ func (m model) viewSwitchMirror() string {
 
 // viewAddMirror 渲染添加镜像源屏幕.
 func (m model) viewAddMirror() string {
-	s := "╔══════════════════════════════════════╗\n"
+	s := uiBorderTop
 	s += "║         添加新的镜像源               ║\n"
-	s += "╚══════════════════════════════════════╝\n\n"
+	s += uiBorderBottom
 
 	switch m.inputStep {
 	case 0:
@@ -539,10 +555,10 @@ func (m model) viewAddMirror() string {
 		s += "\n选择工具类型:\n"
 		cursorCodex := "  "
 		cursorClaude := "  "
-		if m.inputToolType == "codex" {
-			cursorCodex = "▶ "
+		if m.inputToolType == toolTypeCodex {
+			cursorCodex = uiCursor
 		} else {
-			cursorClaude = "▶ "
+			cursorClaude = uiCursor
 		}
 		s += fmt.Sprintf("%sCodex (OpenAI 兼容)\n", cursorCodex)
 		s += fmt.Sprintf("%sClaude\n", cursorClaude)
@@ -555,13 +571,13 @@ func (m model) viewAddMirror() string {
 
 // viewRemoveMirror 渲染删除镜像源屏幕.
 func (m model) viewRemoveMirror() string {
-	s := "╔══════════════════════════════════════╗\n"
+	s := uiBorderTop
 	s += "║         选择要删除的镜像源           ║\n"
-	s += "╚══════════════════════════════════════╝\n\n"
+	s += uiBorderBottom
 
 	switch {
 	case m.mm == nil:
-		s += "错误: 无法初始化镜像管理器\n"
+		s += errMirrorManagerInit
 	case len(m.mirrors) == 0:
 		s += "没有可删除的镜像源\n"
 	default:
@@ -569,7 +585,7 @@ func (m model) viewRemoveMirror() string {
 			mirror := &m.mirrors[i]
 			cursor := "  "
 			if m.cursor == i {
-				cursor = "▶ "
+				cursor = uiCursor
 			}
 			locked := "  "
 			if mirror.Name == internal.DefaultMirrorName {
@@ -587,12 +603,12 @@ func (m model) viewRemoveMirror() string {
 
 // viewViewStatus 渲染查看状态屏幕.
 func (m model) viewViewStatus() string {
-	s := "╔══════════════════════════════════════╗\n"
+	s := uiBorderTop
 	s += "║           当前状态                   ║\n"
-	s += "╚══════════════════════════════════════╝\n\n"
+	s += uiBorderBottom
 
 	if m.mm == nil {
-		s += "错误: 无法初始化镜像管理器\n"
+		s += errMirrorManagerInit
 	} else {
 		config := m.mm.GetConfig()
 
