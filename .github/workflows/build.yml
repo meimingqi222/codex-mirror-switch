@@ -108,7 +108,7 @@ jobs:
             mkdir -p release-gui
             cp -r build/bin/* release-gui/
           else
-            wails build -platform linux/amd64
+            wails build -platform linux/amd64 -tags webkit2_41
             mkdir -p release-gui
             cp build/bin/* release-gui/
           fi
