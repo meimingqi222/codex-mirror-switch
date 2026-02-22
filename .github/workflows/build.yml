@@ -9,7 +9,7 @@ permissions:
   packages: write
 
 jobs:
-  build:
+  build-cli:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -19,19 +19,19 @@ jobs:
           # Windows ARM64 支持有限，暂时排除
           - goos: windows
             goarch: arm64
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
         go-version: '1.24'
-    
+
     - name: Get dependencies
       run: go mod download
-    
-    - name: Build binary
+
+    - name: Build CLI binary
       env:
         GOOS: ${{ matrix.goos }}
         GOARCH: ${{ matrix.goarch }}
@@ -41,40 +41,69 @@ jobs:
       run: |
         # 设置输出文件名
         if [ "$GOOS" = "windows" ]; then
-          OUTPUT_NAME="codex-mirror.exe"
+          OUTPUT_NAME="codex-mirror-cli.exe"
         else
-          OUTPUT_NAME="codex-mirror"
+          OUTPUT_NAME="codex-mirror-cli"
         fi
-        
-        # 编译二进制文件，注入版本信息
-        go build -ldflags="-s -w -X codex-mirror/cmd.Version=${VERSION} -X codex-mirror/cmd.BuildTime=${BUILD_TIME} -X codex-mirror/cmd.GitCommit=${GIT_COMMIT}" -o "$OUTPUT_NAME" main.go
-        
+
+        # 编译 CLI 二进制文件，注入版本信息，使用 cli 构建标签
+        go build -tags cli -ldflags="-s -w -X codex-mirror/cmd.Version=${VERSION} -X codex-mirror/cmd.BuildTime=${BUILD_TIME} -X codex-mirror/cmd.GitCommit=${GIT_COMMIT}" -o "$OUTPUT_NAME" main.go
+
         # 创建发布目录
-        mkdir -p release
-        mv "$OUTPUT_NAME" release/
-    
-    - name: Upload artifacts
+        mkdir -p release-cli
+        mv "$OUTPUT_NAME" release-cli/
+
+    - name: Upload CLI artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: codex-mirror-${{ matrix.goos }}-${{ matrix.goarch }}
-        path: release/
+        name: codex-mirror-cli-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: release-cli/
+
+  build-gui:
+    strategy:
+      fail-fast: false
+      matrix:
+        build:
+          - name: 'codex-mirror-gui'
+            platform: 'linux/amd64'
+            os: 'ubuntu-latest'
+          - name: 'codex-mirror-gui'
+            platform: 'windows/amd64'
+            os: 'windows-latest'
+          - name: 'codex-mirror-gui'
+            platform: 'darwin/universal'
+            os: 'macos-latest'
+    runs-on: ${{ matrix.build.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Build Wails GUI
+        uses: dAppServer/wails-build-action@v2.2
+        id: build
+        with:
+          build-name: ${{ matrix.build.name }}
+          build-platform: ${{ matrix.build.platform }}
+          package: false
+          go-version: '1.24'
 
   test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
         go-version: '1.24'
-    
+
     - name: Run tests
       run: go test -v ./...
-    
+
     - name: Run go vet
       run: go vet ./...
-    
+
     - name: Run go fmt check
       run: |
         if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
@@ -84,38 +113,63 @@ jobs:
         fi
 
   release:
-    needs: [build, test]
+    needs: [build-cli, build-gui, test]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    
+
     steps:
     - uses: actions/checkout@v4
-    
-    - name: Download all artifacts
+
+    - name: Download all CLI artifacts
       uses: actions/download-artifact@v4
       with:
-        path: artifacts
-    
+        path: artifacts-cli
+        pattern: codex-mirror-cli-*
+
+    - name: Download all GUI artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts-gui
+        pattern: codex-mirror-gui-*
+
     - name: Create release archives
       run: |
         mkdir -p release
-        cd artifacts
-        
-        # 为每个平台创建压缩包
+
+        # 处理 CLI  artifacts
+        cd artifacts-cli
         for dir in */; do
           platform=$(basename "$dir")
           cd "$dir"
-          
+
           # 根据平台选择压缩格式
           if [[ "$platform" == *"windows"* ]]; then
             zip -r "../../release/${platform}.zip" .
           else
             tar -czf "../../release/${platform}.tar.gz" .
           fi
-          
+
           cd ..
         done
-    
+        cd ..
+
+        # 处理 GUI artifacts
+        cd artifacts-gui
+        for dir in */; do
+          platform=$(basename "$dir")
+          cd "$dir"
+
+          # 根据平台选择压缩格式
+          if [[ "$platform" == *"windows"* ]]; then
+            zip -r "../../release/${platform}.zip" .
+          else
+            tar -czf "../../release/${platform}.tar.gz" .
+          fi
+
+          cd ..
+        done
+        cd ..
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:

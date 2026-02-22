@@ -105,21 +105,36 @@ lint-ci:
 		exit 1; \
 	fi
 
-# 本地构建
+# 构建 CLI 版本
+.PHONY: build-cli
+build-cli: lint deps
+	@echo "正在构建 $(APP_NAME) CLI 版本..."
+	@mkdir -p $(BUILD_DIR)
+	$(GOBUILD) -tags cli $(GOFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-cli ./main.go
+
+# 快速构建 CLI 版本（跳过lint检查，用于测试）
+.PHONY: build-cli-fast
+build-cli-fast: deps
+	@echo "正在快速构建 $(APP_NAME) CLI 版本..."
+	@mkdir -p $(BUILD_DIR)
+	$(GOBUILD) -tags cli $(GOFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-cli ./main.go
+
+# 构建 GUI 版本
+.PHONY: build-gui
+build-gui: lint deps
+	@echo "正在构建 $(APP_NAME) GUI 版本..."
+	@mkdir -p $(BUILD_DIR)
+	wails build -o $(BUILD_DIR)/$(APP_NAME)-gui
+
+# 本地构建（默认构建 CLI 版本）
 .PHONY: build
-build: lint deps
-	@echo "正在构建 $(APP_NAME)..."
-	@mkdir -p $(BUILD_DIR)
-	$(GOBUILD) $(GOFLAGS) -o $(BUILD_DIR)/$(APP_NAME) ./main.go
+build: build-cli
 
-# 快速构建（跳过lint检查，用于测试）
+# 快速构建（跳过lint检查，用于测试，默认构建 CLI 版本）
 .PHONY: build-fast
-build-fast: deps
-	@echo "正在快速构建 $(APP_NAME)..."
-	@mkdir -p $(BUILD_DIR)
-	$(GOBUILD) $(GOFLAGS) -o $(BUILD_DIR)/$(APP_NAME) ./main.go
+build-fast: build-cli-fast
 
-# 构建当前平台的可执行文件
+# 构建当前平台的可执行文件（默认构建 CLI 版本）
 .PHONY: build-local
 build-local: build
 
