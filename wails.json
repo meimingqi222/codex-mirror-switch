@@ -2,9 +2,9 @@
   "$schema": "https://wails.io/schemas/config.v2.json",
   "name": "Codex Mirror",
   "outputfilename": "codex-mirror-gui",
-  "frontend:install": "echo 'No frontend dependencies to install'",
-  "frontend:build": "echo 'No frontend build step needed'",
-  "frontend:dev:watcher": "echo 'No watcher needed'",
+  "frontend:install": "go version",
+  "frontend:build": "go version",
+  "frontend:dev:watcher": "go version",
   "frontend:dev:serverUrl": "",
   "author": {
     "name": "Codex Mirror",
@@ -21,3 +21,4 @@
   "version": "2",
   "outputType": "desktop"
 }
+
